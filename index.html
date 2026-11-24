@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#071326"><meta name="description" content="Painel local de produtividade comercial Duarte">
+  <title>Duarte · Produtividade Comercial</title><link rel="stylesheet" href="assets/styles.css"><link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="#resumo" aria-label="Duarte, início"><img class="brand-logo" src="assets/brand-logo.png" alt="Duarte"><span><strong>PRODUTIVIDADE<span>.</span></strong><small>INTELIGÊNCIA COMERCIAL</small></span></a>
+    <div class="side-caption">WORKSPACE</div>
+    <nav class="nav-list" aria-label="Navegação principal">
+      <button class="nav-item active" data-view="resumo"><span class="nav-icon">◫</span>Resumo executivo</button>
+      <div class="nav-caption">OPERAÇÃO</div>
+      <button class="nav-item" data-view="credenciamento"><span class="nav-icon">◎</span>Credenciamento</button>
+      <button class="nav-item" data-view="reajuste"><span class="nav-icon">↗</span>Reajuste</button>
+      <button class="nav-item" data-view="extensao"><span class="nav-icon">⇥</span>Extensão</button>
+      <button class="nav-item" data-view="aproximacao"><span class="nav-icon">⌁</span>Aproximação</button>
+      <div class="nav-caption">GESTÃO</div>
+      <button class="nav-item" data-view="produtividade"><span class="nav-icon">▥</span>Produtividade</button>
+      <button class="nav-item" data-view="pendentes"><span class="nav-icon">◷</span>Metas pendentes <span class="nav-count" id="pendingNav">0</span></button>
+      <button class="nav-item" data-view="alertas"><span class="nav-icon">△</span>Alertas &amp; qualidade <span class="nav-dot"></span></button>
+      <button class="nav-item" data-view="processos"><span class="nav-icon">☷</span>Detalhamento</button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="source-card"><div class="source-card-top"><span class="status-lamp" id="connectionLamp"></span><span id="sourceMode">CARREGANDO DADOS</span></div><p id="sourceUpdated">Iniciando leitura das matrizes.</p><button class="source-action" data-action="refresh">Atualizar agora <span>↻</span></button></div>
+      <div class="profile"><div class="profile-avatar">DU</div><div><b>Duarte</b><small>Relatório comercial · local</small></div><button class="profile-more" id="fullscreen" title="Tela cheia">⛶</button></div>
+    </div>
+  </aside>
+  <main class="main-area">
+    <header class="topbar"><div class="top-left"><button id="menuToggle" class="icon-button menu-toggle" aria-label="Abrir menu">☰</button><div class="breadcrumbs"><span>Duarte</span><i>/</i><b id="crumb">Resumo executivo</b></div></div>
+      <div class="top-right"><label class="global-search"><span>⌕</span><input id="globalSearch" placeholder="Buscar cliente ou operadora" autocomplete="off"><kbd>Ctrl K</kbd></label><button class="icon-button notification" id="alertsButton" title="Alertas">♧<i></i></button><div class="top-avatar">DU</div></div>
+    </header>
+    <div class="content-wrap">
+      <div class="global-filterbar panel" id="globalFilters">
+        <label>Responsável<select id="filterOwner"><option value="">Todos</option></select></label>
+        <label>Prioridade<select id="filterPriority"><option value="">Todas</option></select></label>
+        <label>Categoria<select id="filterCategory"><option value="">Todas</option></select></label>
+        <label>Serviço<select id="filterService"><option value="">Todos</option></select></label>
+        <label>Operadora<input id="filterOperator" placeholder="Qualquer operadora"></label>
+        <label>Contato desde<input id="filterFrom" type="date"></label>
+        <label>Até<input id="filterTo" type="date"></label>
+        <button class="outline-button" id="clearFilters">Limpar filtros</button>
+      </div>
+      <div class="view-panel active" id="view-resumo">
+        <div class="page-heading"><div><div class="eyebrow"><span class="pulse-dot"></span> VISÃO DA OPERAÇÃO <span class="demo-chip live-chip">DADOS OPERACIONAIS</span></div><h1>Produtividade comercial<span class="orange">.</span></h1><p>Acompanhe a carteira, entregas, metas e pontos de atenção.</p></div><div class="heading-actions"><label class="date-control"><span>◷</span><select id="periodFilter" aria-label="Período"><option value="all">Todo o histórico</option><option value="30">Últimos 30 dias</option><option value="7">Últimos 7 dias</option><option value="90">Últimos 90 dias</option></select></label><button class="button button-primary" data-action="refresh"><span>↻</span> Atualizar agora</button></div></div>
+        <section class="hero-banner"><div class="hero-grid"></div><div class="hero-copy"><span class="hero-label"><i></i> CENTRAL DE PRODUTIVIDADE</span><h2>Mais clareza para<br><span>avançar cada processo.</span></h2><p>Indicadores, metas e pontos de atenção reunidos para orientar as próximas ações.</p><button class="hero-link" data-view="pendentes">Revisar metas e movimentações <span>↗</span></button></div><div class="hero-art"><img src="assets/brand-logo.png" alt="Duarte"></div><div class="hero-foot"><span><i></i> Fonte: matrizes individuais</span><span id="referenceDate">Referência: —</span></div></section>
+        <div class="section-head"><div><h2>Indicadores principais</h2><p id="summaryCaption">Resumo da carteira e do trabalho comercial</p></div><button class="quiet-link" data-view="processos">Abrir detalhamento <span>→</span></button></div>
+        <section class="kpi-grid" id="kpiGrid"></section>
+        <section class="overview-grid"><article class="panel trend-panel"><div class="panel-heading"><div><h3>Ritmo da operação</h3><p>Processos por serviço</p></div></div><div class="service-bars" id="serviceBars"></div><div class="chart-foot"><span class="legend-dot blue"></span> Processos <span class="legend-dot orange"></span> Metas pendentes confirmadas</div></article>
+          <article class="panel attention-panel"><div class="panel-heading"><div><h3>Precisa de atenção</h3><p>Qualidade, marcações e contatos</p></div><button class="text-link" data-view="alertas">Ver todos →</button></div><div id="attentionList" class="attention-list"></div></article></section>
+        <section class="panel recent-panel"><div class="panel-heading"><div><h3>Atividade da carteira</h3><p>Registros mais recentes no recorte</p></div><button class="text-link" data-view="processos">Ver processos →</button></div><div class="table-scroll"><table class="data-table"><thead><tr><th>CLIENTE / OPERADORA</th><th>SERVIÇO</th><th>STATUS</th><th>RESPONSÁVEL</th><th>ÚLTIMO CONTATO</th><th></th></tr></thead><tbody id="recentRows"></tbody></table></div></section>
+      </div>
+      <div class="view-panel" id="view-credenciamento"></div><div class="view-panel" id="view-reajuste"></div><div class="view-panel" id="view-extensao"></div><div class="view-panel" id="view-aproximacao"></div><div class="view-panel" id="view-produtividade"></div><div class="view-panel" id="view-pendentes"></div><div class="view-panel" id="view-alertas"></div><div class="view-panel" id="view-processos"></div>
+      <footer class="page-footer"><span>DUARTE <b>·</b> PRODUTIVIDADE COMERCIAL</span><span id="footerUpdated">Lendo fontes configuradas…</span></footer>
+    </div>
+  </main>
+</div>
+<div class="mobile-scrim" id="scrim"></div><div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="assets/data-service.js"></script><script src="assets/app.js"></script>
+</body>
+</html>

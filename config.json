@@ -1,0 +1,11 @@
+{
+  "matrices_dir": "dados/matrizes",
+  "responsibles_file": "dados/clientes_credenciamento_responsaveis.xlsx",
+  "refresh_seconds": 60,
+  "pending_days": 7,
+  "stale_contact_days": 7,
+  "adjustment_period_months": 12,
+  "adjustment_warning_days": 60,
+  "listen_on_lan": false,
+  "port": 8765
+}
