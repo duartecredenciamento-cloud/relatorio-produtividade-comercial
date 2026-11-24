@@ -349,18 +349,40 @@ def refresh_loop():
         if not STORE.refreshing:STORE.refresh()
 
 def main():
-    cfg=load_config()
-    host="0.0.0.0" if cfg.get("listen_on_lan",False) else "127.0.0.1"
-    server=Server((host,cfg["port"]),Handler)
-    url=f"http://127.0.0.1:{cfg['port']}"
-    threading.Thread(target=STORE.refresh,daemon=True).start()
-    threading.Thread(target=refresh_loop,daemon=True).start()
-    print(f"Painel Duarte disponível em {url}")
-    print("A leitura inicial das matrizes está em andamento. Deixe esta janela aberta.")
-    print("Para encerrar, pressione Ctrl+C.")
-    if os.environ.get("DUARTE_NO_BROWSER")!="1":threading.Timer(1.2,lambda:webbrowser.open(url)).start()
-    try:server.serve_forever()
-    except KeyboardInterrupt:print("\nEncerrando o painel.")
-    finally:server.server_close()
+    cfg = load_config()
+    railway_port = os.environ.get("PORT")
+
+    # Railway supplies PORT and requires the process to bind on all interfaces.
+    if railway_port:
+        host = "0.0.0.0"
+        port = int(railway_port)
+        if not 1 <= port <= 65535:
+            raise ValueError("A variável PORT precisa estar entre 1 e 65535.")
+        url = None
+    else:
+        host = "0.0.0.0" if cfg.get("listen_on_lan", False) else "127.0.0.1"
+        port = cfg["port"]
+        url = f"http://127.0.0.1:{port}"
+
+    server = Server((host, port), Handler)
+    threading.Thread(target=STORE.refresh, daemon=True).start()
+    threading.Thread(target=refresh_loop, daemon=True).start()
+
+    if railway_port:
+        print(f"Painel Duarte iniciado em {host}:{port} (Railway).")
+        print("A leitura inicial das matrizes está em andamento.")
+    else:
+        print(f"Painel Duarte disponível em {url}")
+        print("A leitura inicial das matrizes está em andamento. Deixe esta janela aberta.")
+        print("Para encerrar, pressione Ctrl+C.")
+        if os.environ.get("DUARTE_NO_BROWSER") != "1":
+            threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nEncerrando o painel.")
+    finally:
+        server.server_close()
 
 if __name__=="__main__":main()
