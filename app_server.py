@@ -5,6 +5,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from socketserver import ThreadingMixIn
 from urllib.parse import parse_qs, urlparse
+import base64
 import csv
 import gzip
 import hmac
@@ -12,11 +13,9 @@ import json
 import logging
 import mimetypes
 import os
-import secrets
 import threading
 import time
 import webbrowser
-from http.cookies import SimpleCookie
 
 import pandas as pd
 
@@ -335,10 +334,6 @@ def filter_records(df,query):
 
 STORE=DashboardStore()
 
-SESSIONS = {}
-SESSIONS_LOCK = threading.Lock()
-SESSION_TTL = 8 * 60 * 60
-
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self,*args,**kwargs):super().__init__(*args,directory=str(BASE),**kwargs)
     def log_message(self,fmt,*args):logger.info("HTTP | %s",fmt%args)
@@ -349,88 +344,36 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(status);self.send_header("Content-Type","application/json; charset=utf-8");self.send_header("Content-Length",str(len(data)));self.send_header("Cache-Control","no-store")
         if compressed:self.send_header("Content-Encoding","gzip");self.send_header("Vary","Accept-Encoding")
         self.end_headers();self.wfile.write(data)
-    def _session_token(self):
-        try:
-            cookies=SimpleCookie();cookies.load(self.headers.get("Cookie", ""))
-            return cookies.get("duarte_session").value if cookies.get("duarte_session") else ""
-        except Exception:return ""
-    def _valid_session(self):
-        token=self._session_token()
-        if not token:return False
-        now=time.time()
-        with SESSIONS_LOCK:
-            for key,expires in list(SESSIONS.items()):
-                if expires<=now:SESSIONS.pop(key,None)
-            expires=SESSIONS.get(token)
-            if not expires:return False
-            SESSIONS[token]=now+SESSION_TTL
-            return True
-    def _credentials_configured(self):
-        return bool(os.environ.get("DASHBOARD_USER") and os.environ.get("DASHBOARD_PASSWORD"))
     def authorize(self):
-        if not self._credentials_configured():
+        if not os.environ.get("PORT") and os.environ.get("REQUIRE_AUTH","").casefold() not in {"1","true","yes"}:
+            return True
+        user=os.environ.get("DASHBOARD_USER","")
+        password=os.environ.get("DASHBOARD_PASSWORD","")
+        if not user or not password:
             self.send_json({"error":"Configure DASHBOARD_USER e DASHBOARD_PASSWORD como variáveis privadas do serviço."},503)
             return False
-        if self._valid_session():return True
-        self.send_json({"error":"Sessão expirada. Entre novamente."},401)
+        expected="Basic "+base64.b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
+        if hmac.compare_digest(self.headers.get("Authorization", ""),expected):
+            return True
+        self.send_response(401);self.send_header("WWW-Authenticate",'Basic realm="Painel Duarte", charset="UTF-8"');self.send_header("Content-Length","0");self.end_headers()
         return False
-    def send_login_page(self):
-        path=BASE/"login.html"
-        if not path.is_file():return self.send_error(500,"Tela de login indisponível")
-        payload=path.read_bytes()
-        self.send_response(200);self.send_header("Content-Type","text/html; charset=utf-8");self.send_header("Content-Length",str(len(payload)));self.send_header("Cache-Control","no-store");self.send_header("X-Content-Type-Options","nosniff");self.end_headers();self.wfile.write(payload)
-    def _cookie_secure(self):
-        return self.headers.get("X-Forwarded-Proto", "").split(",",1)[0].strip().lower()=="https"
-    def _login(self,body):
-        if not self._credentials_configured():
-            return self.send_json({"error":"O acesso ainda não foi configurado pelo administrador."},503)
-        user=str(body.get("username", ""));password=str(body.get("password", ""))
-        good_user=hmac.compare_digest(user,os.environ["DASHBOARD_USER"])
-        good_password=hmac.compare_digest(password,os.environ["DASHBOARD_PASSWORD"])
-        if not (good_user and good_password):
-            return self.send_json({"error":"Usuário ou senha incorretos."},401)
-        token=secrets.token_urlsafe(32)
-        with SESSIONS_LOCK:SESSIONS[token]=time.time()+SESSION_TTL
-        cookie=f"duarte_session={token}; Path=/; Max-Age={SESSION_TTL}; HttpOnly; SameSite=Strict"
-        if self._cookie_secure():cookie+="; Secure"
-        self.send_response(200);self.send_header("Content-Type","application/json; charset=utf-8");self.send_header("Cache-Control","no-store");self.send_header("Set-Cookie",cookie);self.send_header("Content-Length","11");self.end_headers();self.wfile.write(b'{"ok":true}')
-    def _logout(self):
-        token=self._session_token()
-        with SESSIONS_LOCK:SESSIONS.pop(token,None)
-        cookie="duarte_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict"
-        if self._cookie_secure():cookie+="; Secure"
-        self.send_response(200);self.send_header("Content-Type","application/json; charset=utf-8");self.send_header("Cache-Control","no-store");self.send_header("Set-Cookie",cookie);self.send_header("Content-Length","11");self.end_headers();self.wfile.write(b'{"ok":true}')
-    def _serve_asset(self,relative):
-        allowed={"index.html","assets/styles.css","assets/app.css","assets/data-service.js","assets/app.js","assets/brand-logo.png","assets/login.css","assets/login.js"}
-        if relative not in allowed:return self.send_json({"error":"Recurso não encontrado."},404)
-        path=(BASE/relative).resolve()
-        if not path.is_file() or BASE not in path.parents:return self.send_json({"error":"Recurso não encontrado."},404)
-        payload=path.read_bytes();mime=mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-        self.send_response(200);self.send_header("Content-Type",mime+("; charset=utf-8" if mime.startswith("text/") or "javascript" in mime else ""));self.send_header("Content-Length",str(len(payload)));self.send_header("X-Content-Type-Options","nosniff");self.end_headers();self.wfile.write(payload)
     def do_GET(self):
         parsed=urlparse(self.path)
         if parsed.path=="/api/health":return self.send_json({"ok":True,"refreshing":STORE.refreshing,"updatedAt":STORE.last_success.isoformat(timespec="seconds") if STORE.last_success else None})
-        if parsed.path in {"/login","/assets/login.css","/assets/login.js"}:return self._serve_asset(parsed.path.lstrip("/")) if parsed.path.startswith("/assets/") else self.send_login_page()
-        if parsed.path=="/assets/brand-logo.png":return self._serve_asset("assets/brand-logo.png")
-        if parsed.path=="/":
-            if not self._credentials_configured() or not self._valid_session():return self.send_login_page()
-            return self._serve_asset("index.html")
-        if parsed.path=="/api/dashboard":
-            if not self.authorize():return
-            return self.send_json(STORE.snapshot(parse_qs(parsed.query)))
-        if parsed.path.startswith("/assets/"):
-            if not self.authorize():return
-            return self._serve_asset(parsed.path.lstrip("/"))
-        return self.send_json({"error":"Recurso não encontrado."},404)
+        if not self.authorize():return
+        if parsed.path=="/api/dashboard":return self.send_json(STORE.snapshot(parse_qs(parsed.query)))
+        relative="index.html" if parsed.path=="/" else parsed.path.lstrip("/")
+        allowed={"index.html","assets/styles.css","assets/app.css","assets/data-service.js","assets/app.js","assets/brand-logo.png"}
+        if relative not in allowed:return self.send_json({"error":"Recurso não encontrado."},404)
+        path=(BASE/relative).resolve()
+        if not path.is_file() or BASE not in path.parents:return self.send_json({"error":"Recurso não encontrado."},404)
+        payload=path.read_bytes(); mime=mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        self.send_response(200);self.send_header("Content-Type",mime+ ("; charset=utf-8" if mime.startswith("text/") or "javascript" in mime else ""));self.send_header("Content-Length",str(len(payload)));self.send_header("X-Content-Type-Options","nosniff");self.end_headers();self.wfile.write(payload)
     def do_POST(self):
         parsed=urlparse(self.path)
+        if not self.authorize():return
         try:
             n=int(self.headers.get("Content-Length","0"));body=json.loads(self.rfile.read(min(n,20000)) or b"{}")
-            if parsed.path=="/api/login":return self._login(body)
-            if parsed.path=="/api/logout":
-                if not self.authorize():return
-                return self._logout()
-            if not self.authorize():return
             if parsed.path=="/api/refresh":
                 threading.Thread(target=STORE.refresh,daemon=True).start()
                 return self.send_json({"ok":True,"message":"Atualização iniciada."},202)

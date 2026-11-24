@@ -12,7 +12,7 @@ SERVICES = {
     "EXTENSÃO": ("ext_status", "ext_operator", "ext_date", "ext_detail", "ext_notes"),
     "APROXIMAÇÃO": ("apx_status", "apx_operator", "apx_date", "apx_detail", "apx_notes"),
 }
-INACTIVE = {"NAO SE APLICA", "NAO APLICAVEL", "CLIENTE SEM INTERESSE", "AGUARDANDO EDITAIS", "DESCREDENCIADO", "INATIVO", "CANCELADO"}
+INACTIVE = {"NAO SE APLICA", "CLIENTE SEM INTERESSE", "AGUARDANDO EDITAIS"}
 COMPLETED = {"CONCLUIDO", "JA CREDENCIADO", "REALIZADO", "FINALIZADO", "IMPLANTADO"}
 CARD_TERMS = ("CARTAO DE DESCONTO", "PARCERIA")
 
@@ -48,9 +48,10 @@ def is_card_or_partnership(category: object) -> bool:
 
 
 def calculate_pending(marked: object, last_contact: object, today: date, days: int = 7, red_days: int = 10) -> str:
-    """Marcações confirmadas: laranja acima de 7 dias, vermelha acima de 10."""
-    if str(marked).strip().casefold() not in {"sim", "yes", "true", "1"}:
-        return "Não classificado — marcação não confirmada"
+    """Classifica a data pelo critério da planilha: verde até 7 dias, laranja de 8 a 10, vermelho acima de 10.
+
+    O parâmetro `marked` é mantido por compatibilidade, mas a regra da planilha usa a data diretamente.
+    """
     if last_contact is None or pd.isna(last_contact):
         return "META PENDENTE — DATA NÃO INFORMADA"
     try:
@@ -224,10 +225,9 @@ def assert_date_boundary() -> None:
     ref = date(2026, 1, 8)
     assert calculate_pending("Sim", ref - timedelta(days=7), ref, 7, 10) == "Dentro do prazo"
     assert calculate_pending("Sim", ref - timedelta(days=8), ref, 7, 10) == "META PENDENTE — LARANJA"
-    assert calculate_pending("Sim", ref - timedelta(days=10), ref, 7, 10) == "META PENDENTE — LARANJA"
-    assert calculate_pending("Sim", ref - timedelta(days=11), ref, 7, 10) == "META PENDENTE — VERMELHA"
+    assert calculate_pending("Revisar", ref - timedelta(days=10), ref, 7, 10) == "META PENDENTE — LARANJA"
+    assert calculate_pending("Não", ref - timedelta(days=11), ref, 7, 10) == "META PENDENTE — VERMELHA"
     assert calculate_pending("Sim", None, ref, 7, 10) == "META PENDENTE — DATA NÃO INFORMADA"
-    assert calculate_pending("Revisar", ref - timedelta(days=30), ref, 7, 10).startswith("Não classificado")
 
 
 if __name__ == "__main__":

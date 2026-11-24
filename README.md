@@ -29,9 +29,9 @@ Em ambiente publicado, a autenticação HTTP Basic é obrigatória: configure as
 
 ## Regras ajustadas
 
-- **Inativos no credenciamento:** “Não se aplica”, “Cliente sem interesse” e “Aguardando editais” (além dos estados inativos preexistentes).
-- **Em andamento:** estados preenchidos que não sejam inativos nem concluídos.
-- **Metas pendentes:** somente marcações confirmadas com atraso acima de 7 dias; laranja para 8–10 dias e vermelho acima de 10. Dentro do prazo não aparece na lista. Datas ausentes ficam apenas no indicador separado.
+- **Inativos no credenciamento:** somente “Não se aplica”, “Cliente sem interesse” e “Aguardando editais”. O cartão de inativos aparece por último e em vermelho.
+- **Em andamento:** estados preenchidos que não sejam esses três inativos nem concluídos.
+- **Metas pendentes:** classificação pelo prazo da fórmula da planilha, sem depender da confirmação manual da bolinha: verde até 7 dias (oculto), laranja de 8 a 10 dias e vermelho acima de 10 dias. Datas ausentes não entram na lista.
 - Os filtros da página atualizam os cartões e listas no navegador sem solicitar uma nova leitura das planilhas.
 
 ## Testes
