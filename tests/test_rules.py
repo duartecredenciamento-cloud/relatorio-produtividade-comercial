@@ -4,20 +4,25 @@ from datetime import date, timedelta
 import pandas as pd
 
 from src.rules import (add_responsible, calculate_pending, classify_indicator_records,
-                       is_active, is_card_or_partnership, norm_key)
+                       is_active, is_inactive, is_card_or_partnership, norm_key)
 
 
 class RuleTests(unittest.TestCase):
     def test_pending_date_boundary_and_missing(self):
         today = date(2026, 1, 8)
-        self.assertEqual(calculate_pending("Sim", today - timedelta(days=7), today, 7), "Dentro do prazo")
-        self.assertEqual(calculate_pending("Sim", today - timedelta(days=8), today, 7), "META PENDENTE")
-        self.assertEqual(calculate_pending("Sim", None, today, 7), "META PENDENTE — DATA NÃO INFORMADA")
-        self.assertTrue(calculate_pending("Revisar", today - timedelta(days=30), today, 7).startswith("Não classificado"))
+        self.assertEqual(calculate_pending("Sim", today - timedelta(days=7), today, 7, 10), "Dentro do prazo")
+        self.assertEqual(calculate_pending("Sim", today - timedelta(days=8), today, 7, 10), "META PENDENTE — LARANJA")
+        self.assertEqual(calculate_pending("Sim", today - timedelta(days=10), today, 7, 10), "META PENDENTE — LARANJA")
+        self.assertEqual(calculate_pending("Sim", today - timedelta(days=11), today, 7, 10), "META PENDENTE — VERMELHA")
+        self.assertEqual(calculate_pending("Sim", None, today, 7, 10), "META PENDENTE — DATA NÃO INFORMADA")
+        self.assertTrue(calculate_pending("Revisar", today - timedelta(days=30), today, 7, 10).startswith("Não classificado"))
 
     def test_normalization_and_inactive_statuses(self):
         self.assertEqual(norm_key("Clínica  São Camilo!"), "CLINICASAOCAMILO")
         self.assertFalse(is_active("NÃO SE APLICA"))
+        self.assertFalse(is_active("Cliente sem interesse"))
+        self.assertFalse(is_active("Aguardando editais"))
+        self.assertTrue(is_inactive("Cliente sem interesse"))
         self.assertFalse(is_active("DESCREDENCIADO"))
         self.assertTrue(is_active("EM NEGOCIAÇÃO"))
         self.assertTrue(is_card_or_partnership("Cartão de desconto"))

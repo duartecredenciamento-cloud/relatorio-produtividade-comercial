@@ -3,6 +3,7 @@
   "responsibles_file": "dados/clientes_credenciamento_responsaveis.xlsx",
   "refresh_seconds": 60,
   "pending_days": 7,
+  "pending_red_days": 10,
   "stale_contact_days": 7,
   "adjustment_period_months": 12,
   "adjustment_warning_days": 60,

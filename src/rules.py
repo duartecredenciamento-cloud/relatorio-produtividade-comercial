@@ -12,7 +12,7 @@ SERVICES = {
     "EXTENSÃO": ("ext_status", "ext_operator", "ext_date", "ext_detail", "ext_notes"),
     "APROXIMAÇÃO": ("apx_status", "apx_operator", "apx_date", "apx_detail", "apx_notes"),
 }
-INACTIVE = {"NAO SE APLICA", "NAO APLICAVEL", "DESCREDENCIADO", "INATIVO", "CANCELADO"}
+INACTIVE = {"NAO SE APLICA", "NAO APLICAVEL", "CLIENTE SEM INTERESSE", "AGUARDANDO EDITAIS", "DESCREDENCIADO", "INATIVO", "CANCELADO"}
 COMPLETED = {"CONCLUIDO", "JA CREDENCIADO", "REALIZADO", "FINALIZADO", "IMPLANTADO"}
 CARD_TERMS = ("CARTAO DE DESCONTO", "PARCERIA")
 
@@ -28,11 +28,13 @@ def norm_key(value: object) -> str:
     return norm_text(value).replace(" ", "")
 
 
-def is_active(status: object) -> bool:
+def is_inactive(status: object) -> bool:
     s = norm_text(status)
-    if not s:
-        return False
-    return not any(s == x or s.startswith(x + " ") for x in INACTIVE)
+    return bool(s) and any(s == x or s.startswith(x + " ") for x in INACTIVE)
+
+
+def is_active(status: object) -> bool:
+    return bool(norm_text(status)) and not is_inactive(status)
 
 
 def is_completed(status: object) -> bool:
@@ -45,19 +47,21 @@ def is_card_or_partnership(category: object) -> bool:
     return any(term in c for term in CARD_TERMS)
 
 
-def calculate_pending(marked: object, last_contact: object, today: date, days: int = 7) -> str:
-    """A marca precisa estar confirmada como Sim; a data limite é inclusiva."""
+def calculate_pending(marked: object, last_contact: object, today: date, days: int = 7, red_days: int = 10) -> str:
+    """Marcações confirmadas: laranja acima de 7 dias, vermelha acima de 10."""
     if str(marked).strip().casefold() not in {"sim", "yes", "true", "1"}:
         return "Não classificado — marcação não confirmada"
-    cutoff = today - timedelta(days=max(0, int(days)))
     if last_contact is None or pd.isna(last_contact):
         return "META PENDENTE — DATA NÃO INFORMADA"
     try:
         d = pd.Timestamp(last_contact).date()
     except Exception:
         return "META PENDENTE — DATA NÃO INFORMADA"
-    if d < cutoff:
-        return "META PENDENTE"
+    age = (today - d).days
+    if age > max(0, int(red_days)):
+        return "META PENDENTE — VERMELHA"
+    if age > max(0, int(days)):
+        return "META PENDENTE — LARANJA"
     return "Dentro do prazo"
 
 
@@ -197,14 +201,14 @@ def make_quality(records: pd.DataFrame, files: list[dict], today: date, days: in
     return pd.DataFrame(rows)
 
 
-def pending_records(records: pd.DataFrame, days: int, today: date | None = None) -> pd.DataFrame:
+def pending_records(records: pd.DataFrame, days: int, today: date | None = None, red_days: int = 10) -> pd.DataFrame:
     today = today or date.today()
     if records.empty:
         return records.copy()
     out = records[records.status.map(is_active)].copy()
-    out["pending_class"] = [calculate_pending(mark, dt, today, days)
+    out["pending_class"] = [calculate_pending(mark, dt, today, days, red_days)
                             for mark, dt in zip(out.marker_status, out.last_contact)]
-    return out[out.pending_class.isin({"META PENDENTE", "META PENDENTE — DATA NÃO INFORMADA"})]
+    return out[out.pending_class.isin({"META PENDENTE — LARANJA", "META PENDENTE — VERMELHA"})]
 
 
 def indicator_name_records(indicators: dict[str, pd.DataFrame]) -> pd.DataFrame:
@@ -218,10 +222,12 @@ def indicator_name_records(indicators: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
 def assert_date_boundary() -> None:
     ref = date(2026, 1, 8)
-    assert calculate_pending("Sim", ref - timedelta(days=7), ref, 7) == "Dentro do prazo"
-    assert calculate_pending("Sim", ref - timedelta(days=8), ref, 7) == "META PENDENTE"
-    assert calculate_pending("Sim", None, ref, 7) == "META PENDENTE — DATA NÃO INFORMADA"
-    assert calculate_pending("Revisar", ref - timedelta(days=30), ref, 7).startswith("Não classificado")
+    assert calculate_pending("Sim", ref - timedelta(days=7), ref, 7, 10) == "Dentro do prazo"
+    assert calculate_pending("Sim", ref - timedelta(days=8), ref, 7, 10) == "META PENDENTE — LARANJA"
+    assert calculate_pending("Sim", ref - timedelta(days=10), ref, 7, 10) == "META PENDENTE — LARANJA"
+    assert calculate_pending("Sim", ref - timedelta(days=11), ref, 7, 10) == "META PENDENTE — VERMELHA"
+    assert calculate_pending("Sim", None, ref, 7, 10) == "META PENDENTE — DATA NÃO INFORMADA"
+    assert calculate_pending("Revisar", ref - timedelta(days=30), ref, 7, 10).startswith("Não classificado")
 
 
 if __name__ == "__main__":

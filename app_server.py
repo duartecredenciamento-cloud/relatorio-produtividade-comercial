@@ -5,7 +5,10 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from socketserver import ThreadingMixIn
 from urllib.parse import parse_qs, urlparse
+import base64
 import csv
+import gzip
+import hmac
 import json
 import logging
 import mimetypes
@@ -19,12 +22,12 @@ import pandas as pd
 from src.data_loader import (de_duplicate, list_matrix_files, read_aliases, read_manual_csv,
                              read_matrix, read_responsibles, stable_fingerprint)
 from src.rules import (SERVICES, add_responsible, calculate_pending, classify_indicator_records,
-                       is_active, is_completed, is_card_or_partnership, make_quality,
+                       is_active, is_inactive, is_completed, is_card_or_partnership, make_quality,
                        norm_text, pending_records, service_summary)
 
 BASE = Path(__file__).resolve().parent
 DATA = BASE / "dados"
-APPDATA = BASE / "appdata"
+APPDATA = Path(os.environ.get("APPDATA_DIR", str(BASE / "appdata")))
 APPDATA.mkdir(exist_ok=True)
 LOG = APPDATA / "atualizacoes.log"
 GOALS = APPDATA / "metas_manuais.csv"
@@ -44,6 +47,7 @@ DEFAULT_CONFIG = {
     "responsibles_file": "dados/clientes_credenciamento_responsaveis.xlsx",
     "refresh_seconds": 60,
     "pending_days": 7,
+    "pending_red_days": 10,
     "stale_contact_days": 7,
     "adjustment_period_months": 12,
     "adjustment_warning_days": 60,
@@ -57,8 +61,13 @@ def load_config():
         cfg.update(json.loads(CONFIG.read_text(encoding="utf-8")))
     except Exception as exc:
         logger.warning("Configuração padrão utilizada: %s", exc)
+    if os.environ.get("MATRICES_DIR"):
+        cfg["matrices_dir"] = os.environ["MATRICES_DIR"]
+    if os.environ.get("RESPONSIBLES_FILE"):
+        cfg["responsibles_file"] = os.environ["RESPONSIBLES_FILE"]
     cfg["refresh_seconds"] = max(15, int(cfg.get("refresh_seconds", 60)))
     cfg["pending_days"] = max(0, int(cfg.get("pending_days", 7)))
+    cfg["pending_red_days"] = max(cfg["pending_days"], int(cfg.get("pending_red_days", 10)))
     cfg["stale_contact_days"] = max(0, int(cfg.get("stale_contact_days", 7)))
     cfg["port"] = max(1024, min(65535, int(cfg.get("port", 8765))))
     return cfg
@@ -92,12 +101,15 @@ class DashboardStore:
         self.duplicate_count = 0
         self.last_date_rebuild = None
         self.refreshing = False
+        self.snapshot_cache = None
 
     def refresh(self, force=False):
         with self.lock:
             if self.refreshing:
                 return
             self.refreshing = True
+            self.snapshot_cache = None
+        changed = False
         cfg = load_config()
         root = resolve(cfg["matrices_dir"])
         new_status = []
@@ -111,6 +123,7 @@ class DashboardStore:
             with self.lock:
                 for removed in set(self.matrix_cache) - present:
                     del self.matrix_cache[removed]
+                    changed = True
                     logger.info("REMOVIDO | %s", removed)
             for p in paths:
                 key = str(p.resolve())
@@ -129,6 +142,7 @@ class DashboardStore:
                         continue
                     parsed = read_matrix(p)
                     self.matrix_cache[key] = {"fingerprint":fp,"records":parsed["records"],"rows":parsed["rows"],"warnings":parsed["warnings"]}
+                    changed = True
                     new_status.append({"name":p.name,"state":"Atualizado","rows":parsed["rows"],"error":"","warnings":parsed["warnings"]})
                     logger.info("LIDO/ALTERADO | %s | linhas=%s | registros=%s | avisos=%s",p.name,parsed["rows"],len(parsed["records"]),len(parsed["warnings"]))
                     any_ok=True
@@ -145,6 +159,7 @@ class DashboardStore:
                     roster,_=read_responsibles(roster_path)
                     self.roster=roster
                     self.roster_fp=fp
+                    changed = True
                     logger.info("CADASTRO ATUALIZADO | %s | registros=%s",roster_path.name,len(roster))
             except Exception as exc:
                 self.last_error=f"Cadastro de responsáveis: {exc}"
@@ -162,7 +177,11 @@ class DashboardStore:
                 self.last_message="Nenhum arquivo pôde ser lido; os dados anteriores permanecem disponíveis."
             if self.last_error:
                 self.last_message += " " + self.last_error
-            self.rebuild(cfg)
+            if changed or self.last_date_rebuild != date.today():
+                self.rebuild(cfg)
+            else:
+                with self.lock:
+                    self.snapshot_cache = None
         except Exception as exc:
             self.last_error=f"{type(exc).__name__}: {exc}"
             self.last_message="Atualização indisponível; os últimos dados carregados foram preservados."
@@ -171,6 +190,7 @@ class DashboardStore:
         finally:
             with self.lock:
                 self.refreshing=False
+                self.snapshot_cache = None
 
     def rebuild(self,cfg=None):
         cfg=cfg or load_config()
@@ -189,10 +209,11 @@ class DashboardStore:
         # Recalculate date-dependent classifications without reparsing workbooks.
         now=date.today()
         if not records.empty:
-            records["pending_class"]=[calculate_pending(m,d,now,cfg["pending_days"]) for m,d in zip(records.marker_status,records.last_contact)]
+            records["pending_class"]=[calculate_pending(m,d,now,cfg["pending_days"],cfg.get("pending_red_days",10)) for m,d in zip(records.marker_status,records.last_contact)]
         with self.lock:
             self.records=records
             self.last_date_rebuild=now
+            self.snapshot_cache = None
 
     def mark(self, record_id, marked):
         if marked not in {"Sim","Não"}:
@@ -215,7 +236,10 @@ class DashboardStore:
         self.rebuild()
 
     def snapshot(self, query):
+        cacheable = not any((values or [""])[0] for values in query.values())
         with self.lock:
+            if cacheable and not self.refreshing and self.snapshot_cache is not None:
+                return self.snapshot_cache
             records=self.records.copy()
             file_status=list(self.file_status)
             last_success=self.last_success
@@ -229,7 +253,7 @@ class DashboardStore:
         now=date.today()
         active=records[records.status.map(is_active)] if not records.empty else records
         completed=active[active.status.map(is_completed)] if not active.empty else active
-        pending=pending_records(records,cfg["pending_days"],now) if not records.empty else records
+        pending=pending_records(records,cfg["pending_days"],now,cfg.get("pending_red_days",10)) if not records.empty else records
         services=[]
         goals=read_manual_csv(GOALS,["service","target","period"])
         goal_map={r.service:r for _,r in goals.iterrows()} if not goals.empty else {}
@@ -240,7 +264,8 @@ class DashboardStore:
             p=pending[pending.service==service] if not pending.empty else pending
             goal=goal_map.get(service)
             target=int(float(goal.target)) if goal is not None and str(goal.target).strip() else None
-            services.append({"key":service,"name":service,"active":len(a),"completed":len(c),"inProgress":len(a)-len(c),"pending":len(p),"achieved":len(c),"target":target,"targetPeriod":str(goal.period) if goal is not None else None})
+            inactive=g[g.status.map(is_inactive)] if not g.empty else g
+            services.append({"key":service,"name":service,"active":len(a),"inactive":len(inactive),"completed":len(c),"inProgress":len(a)-len(c),"pending":len(p),"achieved":len(c),"target":target,"targetPeriod":str(goal.period) if goal is not None else None})
         indicators=classify_indicator_records(records)
         indicator_counts={k:{"count":len(v),"clients":int(v.client.nunique()) if not v.empty else 0} for k,v in indicators.items()}
         quality=make_quality(records,file_status,now,cfg["stale_contact_days"]) if not records.empty else pd.DataFrame()
@@ -278,7 +303,11 @@ class DashboardStore:
             for _,r in quality.iterrows():
                 quality_rows.append({"type":str(r.get("tipo") or "Alerta"),"client":str(r.get("cliente") or ""),"operator":str(r.get("operadora") or ""),"service":str(r.get("serviço") or ""),"status":str(r.get("status") or ""),"lastContact":iso(r.get("último_contato")),"source":str(r.get("fonte") or ""),"detail":str(r.get("detalhe") or "")})
         updated=last_success.isoformat(timespec="seconds") if last_success else None
-        response={"mode":"live","statusLabel":"ATUALIZAÇÃO EM ANDAMENTO" if refreshing else ("FONTE LOCAL · COM AVISOS" if last_error or any(f.get("error") for f in file_status) else "FONTE LOCAL · MATRIZES"),"statusMessage":message,"updatedAt":updated,"referenceDate":now.isoformat(),"kpis":{"active":len(active),"completed":len(completed),"inProgress":len(active)-len(completed),"pending":len(pending),"owners":len({x["name"] for x in owner_groups if x["name"]!="Responsável não identificado"}),"unassigned":sum(x["name"]=="Responsável não identificado" for x in owner_groups),"completionRate":round(len(completed)/len(active)*100) if len(active) else 0,"markerReview":sum(x["marker"]=="Revisar" for x in mapped)},"services":services,"processes":mapped,"pendingRecords":pending_mapped,"owners":owner_groups,"priorities":priorities,"indicators":indicator_counts,"quality":quality_rows,"qualitySummary":qrecords,"fileStatus":file_status,"filterOptions":all_opts,"config":{"pendingDays":cfg["pending_days"],"refreshSeconds":cfg["refresh_seconds"],"staleContactDays":cfg["stale_contact_days"]},"duplicates":duplicate_count}
+        response={"mode":"live","statusLabel":"ATUALIZAÇÃO EM ANDAMENTO" if refreshing else ("FONTE LOCAL · COM AVISOS" if last_error or any(f.get("error") for f in file_status) else "FONTE LOCAL · MATRIZES"),"statusMessage":message,"updatedAt":updated,"referenceDate":now.isoformat(),"kpis":{"active":len(active),"inactive":int(records.status.map(is_inactive).sum()) if not records.empty else 0,"completed":len(completed),"inProgress":len(active)-len(completed),"pending":len(pending),"owners":len({x["name"] for x in owner_groups if x["name"]!="Responsável não identificado"}),"unassigned":sum(x["name"]=="Responsável não identificado" for x in owner_groups),"completionRate":round(len(completed)/len(active)*100) if len(active) else 0,"markerReview":sum(x["marker"]=="Revisar" for x in mapped)},"services":services,"processes":mapped,"pendingRecords":pending_mapped,"owners":owner_groups,"priorities":priorities,"indicators":indicator_counts,"quality":quality_rows,"qualitySummary":qrecords,"fileStatus":file_status,"filterOptions":all_opts,"config":{"pendingDays":cfg["pending_days"],"pendingRedDays":cfg.get("pending_red_days",10),"refreshSeconds":cfg["refresh_seconds"],"staleContactDays":cfg["stale_contact_days"]},"duplicates":duplicate_count}
+        if cacheable:
+            with self.lock:
+                if not self.refreshing:
+                    self.snapshot_cache=response
         return response
 
 def filter_records(df,query):
@@ -310,10 +339,28 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self,fmt,*args):logger.info("HTTP | %s",fmt%args)
     def send_json(self,obj,status=200):
         data=json.dumps(obj,ensure_ascii=False,default=str).encode("utf-8")
-        self.send_response(status);self.send_header("Content-Type","application/json; charset=utf-8");self.send_header("Content-Length",str(len(data)));self.send_header("Cache-Control","no-store");self.end_headers();self.wfile.write(data)
+        compressed="gzip" in self.headers.get("Accept-Encoding","").lower()
+        if compressed:data=gzip.compress(data,compresslevel=5)
+        self.send_response(status);self.send_header("Content-Type","application/json; charset=utf-8");self.send_header("Content-Length",str(len(data)));self.send_header("Cache-Control","no-store")
+        if compressed:self.send_header("Content-Encoding","gzip");self.send_header("Vary","Accept-Encoding")
+        self.end_headers();self.wfile.write(data)
+    def authorize(self):
+        if not os.environ.get("PORT") and os.environ.get("REQUIRE_AUTH","").casefold() not in {"1","true","yes"}:
+            return True
+        user=os.environ.get("DASHBOARD_USER","")
+        password=os.environ.get("DASHBOARD_PASSWORD","")
+        if not user or not password:
+            self.send_json({"error":"Configure DASHBOARD_USER e DASHBOARD_PASSWORD como variáveis privadas do serviço."},503)
+            return False
+        expected="Basic "+base64.b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
+        if hmac.compare_digest(self.headers.get("Authorization", ""),expected):
+            return True
+        self.send_response(401);self.send_header("WWW-Authenticate",'Basic realm="Painel Duarte", charset="UTF-8"');self.send_header("Content-Length","0");self.end_headers()
+        return False
     def do_GET(self):
         parsed=urlparse(self.path)
         if parsed.path=="/api/health":return self.send_json({"ok":True,"refreshing":STORE.refreshing,"updatedAt":STORE.last_success.isoformat(timespec="seconds") if STORE.last_success else None})
+        if not self.authorize():return
         if parsed.path=="/api/dashboard":return self.send_json(STORE.snapshot(parse_qs(parsed.query)))
         relative="index.html" if parsed.path=="/" else parsed.path.lstrip("/")
         allowed={"index.html","assets/styles.css","assets/app.css","assets/data-service.js","assets/app.js","assets/brand-logo.png"}
@@ -324,10 +371,11 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(200);self.send_header("Content-Type",mime+ ("; charset=utf-8" if mime.startswith("text/") or "javascript" in mime else ""));self.send_header("Content-Length",str(len(payload)));self.send_header("X-Content-Type-Options","nosniff");self.end_headers();self.wfile.write(payload)
     def do_POST(self):
         parsed=urlparse(self.path)
+        if not self.authorize():return
         try:
             n=int(self.headers.get("Content-Length","0"));body=json.loads(self.rfile.read(min(n,20000)) or b"{}")
             if parsed.path=="/api/refresh":
-                threading.Thread(target=STORE.refresh,kwargs={"force":True},daemon=True).start()
+                threading.Thread(target=STORE.refresh,daemon=True).start()
                 return self.send_json({"ok":True,"message":"Atualização iniciada."},202)
             if parsed.path=="/api/marker":
                 STORE.mark(str(body.get("record_id","")),str(body.get("marked","")))
@@ -349,40 +397,19 @@ def refresh_loop():
         if not STORE.refreshing:STORE.refresh()
 
 def main():
-    cfg = load_config()
-    railway_port = os.environ.get("PORT")
-
-    # Railway supplies PORT and requires the process to bind on all interfaces.
-    if railway_port:
-        host = "0.0.0.0"
-        port = int(railway_port)
-        if not 1 <= port <= 65535:
-            raise ValueError("A variável PORT precisa estar entre 1 e 65535.")
-        url = None
-    else:
-        host = "0.0.0.0" if cfg.get("listen_on_lan", False) else "127.0.0.1"
-        port = cfg["port"]
-        url = f"http://127.0.0.1:{port}"
-
-    server = Server((host, port), Handler)
-    threading.Thread(target=STORE.refresh, daemon=True).start()
-    threading.Thread(target=refresh_loop, daemon=True).start()
-
-    if railway_port:
-        print(f"Painel Duarte iniciado em {host}:{port} (Railway).")
-        print("A leitura inicial das matrizes está em andamento.")
-    else:
-        print(f"Painel Duarte disponível em {url}")
-        print("A leitura inicial das matrizes está em andamento. Deixe esta janela aberta.")
-        print("Para encerrar, pressione Ctrl+C.")
-        if os.environ.get("DUARTE_NO_BROWSER") != "1":
-            threading.Timer(1.2, lambda: webbrowser.open(url)).start()
-
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nEncerrando o painel.")
-    finally:
-        server.server_close()
+    cfg=load_config()
+    port=int(os.environ.get("PORT",cfg["port"]))
+    host="0.0.0.0" if os.environ.get("PORT") or cfg.get("listen_on_lan",False) else "127.0.0.1"
+    server=Server((host,port),Handler)
+    url=f"http://127.0.0.1:{port}"
+    threading.Thread(target=STORE.refresh,daemon=True).start()
+    threading.Thread(target=refresh_loop,daemon=True).start()
+    print(f"Painel Duarte iniciado em {host}:{port}")
+    print("A leitura inicial das matrizes está em andamento. Deixe esta janela aberta.")
+    print("Para encerrar, pressione Ctrl+C.")
+    if os.environ.get("DUARTE_NO_BROWSER")!="1":threading.Timer(1.2,lambda:webbrowser.open(url)).start()
+    try:server.serve_forever()
+    except KeyboardInterrupt:print("\nEncerrando o painel.")
+    finally:server.server_close()
 
 if __name__=="__main__":main()

@@ -1,4 +1,9 @@
 window.DataService = {
+  async health() {
+    const response = await fetch("/api/health", { headers: { Accept: "application/json" }, cache: "no-store" });
+    if (!response.ok) throw new Error("Não foi possível verificar o estado da leitura.");
+    return response.json();
+  },
   async loadDashboard(filters = {}) {
     const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== "" && value != null));
     const response = await fetch(`/api/dashboard${query.size ? `?${query}` : ""}`, {

@@ -117,7 +117,7 @@ def _map_headers(normalized_headers):
 def read_matrix(path: Path) -> dict:
     """Reads only the FLUXO OPERACIONAL sheet and never writes to a source file."""
     result = {"records": [], "warnings": [], "rows": 0, "marker_mode": "unconfirmed"}
-    wb = load_workbook(path, read_only=True, data_only=True, keep_vba=path.suffix.lower() == ".xlsm")
+    wb = load_workbook(path, read_only=True, data_only=True)
     try:
         ws = wb["FLUXO OPERACIONAL"] if "FLUXO OPERACIONAL" in wb.sheetnames else wb[wb.sheetnames[0]]
         header_row, headers, score = _find_header(ws)
