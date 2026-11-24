@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#193b68">
+  <meta name="description" content="Acesso ao painel de produtividade comercial Duarte">
+  <title>Entrar · Duarte Produtividade Comercial</title>
+  <link rel="preload" as="image" href="/assets/brand-logo.png">
+  <link rel="stylesheet" href="/assets/login.css">
+  <script src="/assets/login.js" defer></script>
+</head>
+<body>
+  <main class="login-layout">
+    <section class="brand-panel" aria-label="Duarte Produtividade Comercial">
+      <div class="brand-glow brand-glow-one"></div>
+      <div class="brand-glow brand-glow-two"></div>
+      <div class="brand-grid" aria-hidden="true"></div>
+      <a class="brand-lockup" href="/" aria-label="Duarte — página de acesso">
+        <img src="/assets/brand-logo.png" alt="Duarte">
+        <span class="brand-product">PRODUTIVIDADE COMERCIAL</span>
+      </a>
+      <div class="brand-message">
+        <span class="overline"><i></i> INTELIGÊNCIA COMERCIAL</span>
+        <h1>Clareza para<br><em>avançar cada processo.</em></h1>
+        <p>Uma visão organizada da carteira, das metas e dos próximos passos da sua operação.</p>
+      </div>
+      <div class="brand-footer"><span>DUARTE <b>·</b> PRODUTIVIDADE COMERCIAL</span><span>PAINEL DE ACESSO RESTRITO</span></div>
+    </section>
+
+    <section class="form-panel" aria-labelledby="loginTitle">
+      <div class="form-wrap">
+        <div class="mobile-brand"><img src="/assets/brand-logo.png" alt="Duarte"><span>PRODUTIVIDADE COMERCIAL</span></div>
+        <div class="form-eyebrow"><span class="shield" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3 19 6v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg></span> ÁREA SEGURA</div>
+        <h2 id="loginTitle">Bem-vindo de volta<span>.</span></h2>
+        <p class="form-intro">Entre com suas credenciais para acessar o painel.</p>
+
+        <form id="loginForm" novalidate>
+          <label for="username">Usuário</label>
+          <div class="input-wrap">
+            <svg class="field-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+            <input id="username" name="username" type="text" autocomplete="username" placeholder="Digite seu usuário" required autofocus>
+          </div>
+
+          <div class="password-label"><label for="password">Senha</label><span>Use sua senha do painel</span></div>
+          <div class="input-wrap">
+            <svg class="field-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/><path d="M12 14v3"/></svg>
+            <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Digite sua senha" required>
+            <button class="password-toggle" id="togglePassword" type="button" aria-label="Mostrar senha" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.5 12s3.3-6 9.5-6 9.5 6 9.5 6-3.3 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></svg></button>
+          </div>
+
+          <div class="error-message" id="loginError" role="alert" aria-live="polite" hidden></div>
+          <button class="submit-button" id="submitButton" type="submit"><span class="button-label">Entrar no painel</span><span class="button-arrow" aria-hidden="true">→</span><span class="button-spinner" aria-hidden="true"></span></button>
+        </form>
+
+        <div class="access-note"><span class="note-dot"></span><span>Este painel é destinado a usuários autorizados.</span></div>
+        <div class="form-footer"><span>DUARTE</span><span>PRODUTIVIDADE COMERCIAL</span><span>·</span><span>ACESSO PRIVADO</span></div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
