@@ -1,0 +1,17 @@
+ATUALIZAÇÃO DOS FILTROS VISUAIS — DUARTE
+
+Este pacote contém somente os arquivos de interface atualizados. Não inclui matrizes, planilhas de clientes, credenciais ou configuração do Railway.
+
+INSTALAÇÃO LOCAL
+1. Pare o servidor atual com Ctrl+C na janela do PowerShell.
+2. Extraia este ZIP diretamente na raiz do repositório clonado (por exemplo: C:\Users\User\Desktop\produtividade_git) e escolha substituir os arquivos.
+3. Inicie novamente o painel usando o mesmo comando que já funcionou, com MATRICES_DIR apontando para a pasta oficial do Drive.
+4. No navegador, faça Ctrl+F5. Clique em cartões, barras, status, responsáveis, prioridades ou clientes para filtrar as listas. Clique de novo ou use “Remover filtro”/“Limpar filtros” para desfazer.
+
+PUBLICAÇÃO NO GITHUB (OPCIONAL)
+Confira primeiro `git status`. Se somente assets/app.js e assets/app.css estiverem alterados, execute:
+  git add assets/app.js assets/app.css
+  git commit -m "Filtros visuais interativos"
+  git push
+
+O pacote não altera app_server.py, config.json, autenticação ou origem das matrizes.

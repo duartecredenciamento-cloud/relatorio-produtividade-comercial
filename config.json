@@ -1,5 +1,5 @@
 {
-  "matrices_dir": "dados/matrizes",
+  "matrices_dir": "G:/Meu Drive/OPERAÇÃO/1 - COMERCIAL/DEMONSTRATIVOSDIARIOS_COM/NOVA MATRIZ CREDENCIAMENTO",
   "responsibles_file": "dados/clientes_credenciamento_responsaveis.xlsx",
   "refresh_seconds": 60,
   "pending_days": 7,
