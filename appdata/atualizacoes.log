@@ -1,0 +1,163 @@
+2026-11-25 14:15:30,651 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1006 CLÍNICA FISIO LIFE.xlsm | linhas=116 | registros=464 | avisos=1
+2026-11-25 14:15:31,526 | INFO | HTTP | "GET / HTTP/1.1" 200 -
+2026-11-25 14:15:31,640 | INFO | HTTP | "GET /assets/styles.css HTTP/1.1" 200 -
+2026-11-25 14:15:31,845 | INFO | HTTP | "GET /assets/app.css HTTP/1.1" 200 -
+2026-11-25 14:15:31,847 | INFO | HTTP | "GET /assets/brand-logo.png HTTP/1.1" 200 -
+2026-11-25 14:15:31,876 | INFO | HTTP | "GET /assets/data-service.js HTTP/1.1" 200 -
+2026-11-25 14:15:31,878 | INFO | HTTP | "GET /assets/app.js HTTP/1.1" 200 -
+2026-11-25 14:15:32,297 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:15:32,627 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1010 CLÍNICA MEDLIGHT.xlsm | linhas=158 | registros=587 | avisos=1
+2026-11-25 14:15:34,919 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:15:35,446 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1011 CLÍNICA MULHER MODERNA.xlsm | linhas=43 | registros=172 | avisos=1
+2026-11-25 14:15:37,443 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:15:38,348 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1012 PRÓ EXAME.xlsm | linhas=136 | registros=544 | avisos=1
+2026-11-25 14:15:39,957 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:15:41,242 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1023 IMC - INSTITUTO MENDONÇA COSTA.xlsm | linhas=248 | registros=908 | avisos=1
+2026-11-25 14:15:42,173 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1035 CLÍNICA DE ALERGIA DRA. ROSANA NEVES.xlsm | linhas=113 | registros=452 | avisos=1
+2026-11-25 14:15:42,493 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:15:43,212 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1036 CIE - CLINICA DE INTEGRAÇÃO ESSENCIA.xlsm | linhas=99 | registros=396 | avisos=1
+2026-11-25 14:15:44,502 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1044 EV CITI.xlsm | linhas=131 | registros=524 | avisos=1
+2026-11-25 14:15:45,090 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:15:45,434 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1045 ATIVAMENTE.xlsm | linhas=83 | registros=332 | avisos=1
+2026-11-25 14:15:46,736 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1056 INSTITUTO VER.xlsm | linhas=375 | registros=1500 | avisos=1
+2026-11-25 14:15:47,642 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:15:47,726 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1058 PRIME SERVICOS MEDICOS.xlsm | linhas=129 | registros=516 | avisos=1
+2026-11-25 14:15:50,245 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:15:50,518 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1059 CLÍNICA AMINO.xlsm | linhas=136 | registros=544 | avisos=1
+2026-11-25 14:15:51,610 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1064 CLÍNICA MVS.xlsm | linhas=138 | registros=524 | avisos=1
+2026-11-25 14:15:52,442 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1065 CLÍNICA DR DIOGO PARAUAPEBAS.xlsm | linhas=42 | registros=168 | avisos=1
+2026-11-25 14:15:52,771 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:15:54,817 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1066 CLÍNICA FARFALLA.xlsm | linhas=135 | registros=540 | avisos=1
+2026-11-25 14:15:55,341 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:15:55,809 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1067 HOSPITAL AMATO.xlsm | linhas=130 | registros=520 | avisos=1
+2026-11-25 14:15:56,733 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1068 CANTAREIRA.xlsm | linhas=109 | registros=436 | avisos=1
+2026-11-25 14:15:57,859 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:15:59,215 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1069 EMS.xlsm | linhas=127 | registros=508 | avisos=1
+2026-11-25 14:16:00,098 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1070 BRUNO NASCIMENTO.xlsm | linhas=130 | registros=520 | avisos=1
+2026-11-25 14:16:00,374 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:16:01,160 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1073 VIVENCY.xlsm | linhas=136 | registros=544 | avisos=1
+2026-11-25 14:16:02,898 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:16:03,980 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1074 CLÍNICA TOPAZIO.xlsm | linhas=135 | registros=540 | avisos=1
+2026-11-25 14:16:04,919 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1075 ALPHALABS.xlsm | linhas=134 | registros=536 | avisos=1
+2026-11-25 14:16:05,501 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:16:05,958 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1076 CLÍNICA COFFI.xlsm | linhas=135 | registros=540 | avisos=1
+2026-11-25 14:16:06,933 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1079 CLÍNICA RBL.xlsm | linhas=135 | registros=540 | avisos=1
+2026-11-25 14:16:07,836 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1080 VIVA TERAPIAS.xlsm | linhas=135 | registros=540 | avisos=1
+2026-11-25 14:16:08,653 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1084 CLÍNICA DR JOÃO QUIRICI.xlsm | linhas=136 | registros=544 | avisos=1
+2026-11-25 14:16:11,238 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1085 CLÍNICA SPORT FISIO CENTER.xlsm | linhas=99 | registros=396 | avisos=1
+2026-11-25 14:16:11,466 | INFO | CADASTRO ATUALIZADO | clientes_credenciamento_responsaveis.xlsx | registros=29
+2026-11-25 14:18:03,713 | ERROR | ATUALIZAÇÃO INDISPONÍVEL
+Traceback (most recent call last):
+  File "C:\Users\User\Desktop\produtividade_git\app_server.py", line 120, in refresh
+    raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
+FileNotFoundError: Pasta de matrizes indisponível: G:\Meu Drive\OPERAÇÃO\1 - COMERCIAL\DEMONSTRATIVOSDIARIOS_COM\NOVA MATRIZ CREDENCIAL
+2026-11-25 14:18:05,699 | INFO | HTTP | "GET / HTTP/1.1" 200 -
+2026-11-25 14:18:05,765 | INFO | HTTP | "GET /assets/styles.css HTTP/1.1" 200 -
+2026-11-25 14:18:05,837 | INFO | HTTP | "GET /assets/app.css HTTP/1.1" 200 -
+2026-11-25 14:18:05,869 | INFO | HTTP | "GET /assets/brand-logo.png HTTP/1.1" 200 -
+2026-11-25 14:18:05,882 | INFO | HTTP | "GET /assets/data-service.js HTTP/1.1" 200 -
+2026-11-25 14:18:05,903 | INFO | HTTP | "GET /assets/app.js HTTP/1.1" 200 -
+2026-11-25 14:18:06,206 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:18:06,355 | INFO | HTTP | "GET /api/dashboard HTTP/1.1" 200 -
+2026-11-25 14:19:03,714 | ERROR | ATUALIZAÇÃO INDISPONÍVEL
+Traceback (most recent call last):
+  File "C:\Users\User\Desktop\produtividade_git\app_server.py", line 120, in refresh
+    raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
+FileNotFoundError: Pasta de matrizes indisponível: G:\Meu Drive\OPERAÇÃO\1 - COMERCIAL\DEMONSTRATIVOSDIARIOS_COM\NOVA MATRIZ CREDENCIAL
+2026-11-25 14:20:03,717 | ERROR | ATUALIZAÇÃO INDISPONÍVEL
+Traceback (most recent call last):
+  File "C:\Users\User\Desktop\produtividade_git\app_server.py", line 120, in refresh
+    raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
+FileNotFoundError: Pasta de matrizes indisponível: G:\Meu Drive\OPERAÇÃO\1 - COMERCIAL\DEMONSTRATIVOSDIARIOS_COM\NOVA MATRIZ CREDENCIAL
+2026-11-25 14:21:03,721 | ERROR | ATUALIZAÇÃO INDISPONÍVEL
+Traceback (most recent call last):
+  File "C:\Users\User\Desktop\produtividade_git\app_server.py", line 120, in refresh
+    raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
+FileNotFoundError: Pasta de matrizes indisponível: G:\Meu Drive\OPERAÇÃO\1 - COMERCIAL\DEMONSTRATIVOSDIARIOS_COM\NOVA MATRIZ CREDENCIAL
+2026-11-25 14:22:03,724 | ERROR | ATUALIZAÇÃO INDISPONÍVEL
+Traceback (most recent call last):
+  File "C:\Users\User\Desktop\produtividade_git\app_server.py", line 120, in refresh
+    raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
+FileNotFoundError: Pasta de matrizes indisponível: G:\Meu Drive\OPERAÇÃO\1 - COMERCIAL\DEMONSTRATIVOSDIARIOS_COM\NOVA MATRIZ CREDENCIAL
+2026-11-25 14:23:03,728 | ERROR | ATUALIZAÇÃO INDISPONÍVEL
+Traceback (most recent call last):
+  File "C:\Users\User\Desktop\produtividade_git\app_server.py", line 120, in refresh
+    raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
+FileNotFoundError: Pasta de matrizes indisponível: G:\Meu Drive\OPERAÇÃO\1 - COMERCIAL\DEMONSTRATIVOSDIARIOS_COM\NOVA MATRIZ CREDENCIAL
+2026-11-25 14:24:03,742 | ERROR | ATUALIZAÇÃO INDISPONÍVEL
+Traceback (most recent call last):
+  File "C:\Users\User\Desktop\produtividade_git\app_server.py", line 120, in refresh
+    raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
+FileNotFoundError: Pasta de matrizes indisponível: G:\Meu Drive\OPERAÇÃO\1 - COMERCIAL\DEMONSTRATIVOSDIARIOS_COM\NOVA MATRIZ CREDENCIAL
+2026-11-25 14:25:03,746 | ERROR | ATUALIZAÇÃO INDISPONÍVEL
+Traceback (most recent call last):
+  File "C:\Users\User\Desktop\produtividade_git\app_server.py", line 120, in refresh
+    raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
+FileNotFoundError: Pasta de matrizes indisponível: G:\Meu Drive\OPERAÇÃO\1 - COMERCIAL\DEMONSTRATIVOSDIARIOS_COM\NOVA MATRIZ CREDENCIAL
+2026-11-25 14:26:03,749 | ERROR | ATUALIZAÇÃO INDISPONÍVEL
+Traceback (most recent call last):
+  File "C:\Users\User\Desktop\produtividade_git\app_server.py", line 120, in refresh
+    raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
+FileNotFoundError: Pasta de matrizes indisponível: G:\Meu Drive\OPERAÇÃO\1 - COMERCIAL\DEMONSTRATIVOSDIARIOS_COM\NOVA MATRIZ CREDENCIAL
+2026-11-25 14:27:03,752 | ERROR | ATUALIZAÇÃO INDISPONÍVEL
+Traceback (most recent call last):
+  File "C:\Users\User\Desktop\produtividade_git\app_server.py", line 120, in refresh
+    raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
+FileNotFoundError: Pasta de matrizes indisponível: G:\Meu Drive\OPERAÇÃO\1 - COMERCIAL\DEMONSTRATIVOSDIARIOS_COM\NOVA MATRIZ CREDENCIAL
+2026-11-25 14:28:03,755 | ERROR | ATUALIZAÇÃO INDISPONÍVEL
+Traceback (most recent call last):
+  File "C:\Users\User\Desktop\produtividade_git\app_server.py", line 120, in refresh
+    raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
+FileNotFoundError: Pasta de matrizes indisponível: G:\Meu Drive\OPERAÇÃO\1 - COMERCIAL\DEMONSTRATIVOSDIARIOS_COM\NOVA MATRIZ CREDENCIAL
+2026-11-25 14:29:03,758 | ERROR | ATUALIZAÇÃO INDISPONÍVEL
+Traceback (most recent call last):
+  File "C:\Users\User\Desktop\produtividade_git\app_server.py", line 120, in refresh
+    raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
+FileNotFoundError: Pasta de matrizes indisponível: G:\Meu Drive\OPERAÇÃO\1 - COMERCIAL\DEMONSTRATIVOSDIARIOS_COM\NOVA MATRIZ CREDENCIAL
+2026-11-25 14:32:22,192 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1006 CLÍNICA FISIO LIFE.xlsm | linhas=116 | registros=464 | avisos=1
+2026-11-25 14:32:23,334 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1010 CLÍNICA MEDLIGHT.xlsm | linhas=158 | registros=587 | avisos=1
+2026-11-25 14:32:24,257 | INFO | HTTP | "GET / HTTP/1.1" 401 -
+2026-11-25 14:32:24,766 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1011 CLÍNICA MULHER MODERNA.xlsm | linhas=43 | registros=172 | avisos=1
+2026-11-25 14:32:25,838 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1012 PRÓ EXAME.xlsm | linhas=136 | registros=544 | avisos=1
+2026-11-25 14:32:29,942 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1023 IMC - INSTITUTO MENDONÇA COSTA.xlsm | linhas=248 | registros=908 | avisos=1
+2026-11-25 14:32:30,990 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1035 CLÍNICA DE ALERGIA DRA. ROSANA NEVES.xlsm | linhas=113 | registros=452 | avisos=1
+2026-11-25 14:32:31,941 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1036 CIE - CLINICA DE INTEGRAÇÃO ESSENCIA.xlsm | linhas=99 | registros=396 | avisos=1
+2026-11-25 14:32:34,892 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1044 EV CITI.xlsm | linhas=131 | registros=524 | avisos=1
+2026-11-25 14:32:35,782 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1045 ATIVAMENTE.xlsm | linhas=83 | registros=332 | avisos=1
+2026-11-25 14:32:36,975 | INFO | HTTP | "GET / HTTP/1.1" 401 -
+2026-11-25 14:32:37,136 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1056 INSTITUTO VER.xlsm | linhas=375 | registros=1500 | avisos=1
+2026-11-25 14:32:38,048 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1058 PRIME SERVICOS MEDICOS.xlsm | linhas=129 | registros=516 | avisos=1
+2026-11-25 14:32:39,151 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1059 CLÍNICA AMINO.xlsm | linhas=136 | registros=544 | avisos=1
+2026-11-25 14:32:40,061 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1064 CLÍNICA MVS.xlsm | linhas=138 | registros=524 | avisos=1
+2026-11-25 14:32:40,846 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1065 CLÍNICA DR DIOGO PARAUAPEBAS.xlsm | linhas=42 | registros=168 | avisos=1
+2026-11-25 14:32:41,771 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1066 CLÍNICA FARFALLA.xlsm | linhas=135 | registros=540 | avisos=1
+2026-11-25 14:32:42,680 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1067 HOSPITAL AMATO.xlsm | linhas=130 | registros=520 | avisos=1
+2026-11-25 14:32:43,737 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1068 CANTAREIRA.xlsm | linhas=109 | registros=436 | avisos=1
+2026-11-25 14:32:44,694 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1069 EMS.xlsm | linhas=127 | registros=508 | avisos=1
+2026-11-25 14:32:45,676 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1070 BRUNO NASCIMENTO.xlsm | linhas=130 | registros=520 | avisos=1
+2026-11-25 14:32:46,643 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1073 VIVENCY.xlsm | linhas=136 | registros=544 | avisos=1
+2026-11-25 14:32:47,832 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1074 CLÍNICA TOPAZIO.xlsm | linhas=135 | registros=540 | avisos=1
+2026-11-25 14:32:48,844 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1075 ALPHALABS.xlsm | linhas=134 | registros=536 | avisos=1
+2026-11-25 14:32:49,018 | INFO | HTTP | "GET / HTTP/1.1" 401 -
+2026-11-25 14:32:49,823 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1076 CLÍNICA COFFI.xlsm | linhas=135 | registros=540 | avisos=1
+2026-11-25 14:32:50,867 | INFO | HTTP | "GET / HTTP/1.1" 401 -
+2026-11-25 14:32:51,093 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1079 CLÍNICA RBL.xlsm | linhas=135 | registros=540 | avisos=1
+2026-11-25 14:32:51,947 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1080 VIVA TERAPIAS.xlsm | linhas=135 | registros=540 | avisos=1
+2026-11-25 14:32:52,785 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1084 CLÍNICA DR JOÃO QUIRICI.xlsm | linhas=136 | registros=544 | avisos=1
+2026-11-25 14:32:53,692 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1085 CLÍNICA SPORT FISIO CENTER.xlsm | linhas=99 | registros=396 | avisos=1
+2026-11-25 14:32:53,908 | INFO | CADASTRO ATUALIZADO | clientes_credenciamento_responsaveis.xlsx | registros=29
+2026-11-25 14:32:55,713 | INFO | HTTP | "GET / HTTP/1.1" 200 -
+2026-11-25 14:32:55,933 | INFO | HTTP | "GET /assets/styles.css HTTP/1.1" 200 -
+2026-11-25 14:32:55,953 | INFO | HTTP | "GET /assets/app.css HTTP/1.1" 200 -
+2026-11-25 14:32:56,243 | INFO | HTTP | "GET /assets/brand-logo.png HTTP/1.1" 200 -
+2026-11-25 14:32:56,330 | INFO | HTTP | "GET /assets/app.js HTTP/1.1" 200 -
+2026-11-25 14:32:56,348 | INFO | HTTP | "GET /assets/data-service.js HTTP/1.1" 200 -
+2026-11-25 14:32:56,631 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:32:59,802 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:33:02,511 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:33:02,527 | INFO | HTTP | "GET /api/health HTTP/1.1" 200 -
+2026-11-25 14:34:25,951 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1044 EV CITI.xlsm | linhas=131 | registros=524 | avisos=1
+2026-11-25 14:35:08,969 | INFO | HTTP | "GET /api/dashboard HTTP/1.1" 200 -
+2026-11-25 14:41:37,878 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1044 EV CITI.xlsm | linhas=131 | registros=524 | avisos=1
+2026-11-25 14:45:45,718 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1059 CLÍNICA AMINO.xlsm | linhas=136 | registros=544 | avisos=1
+2026-11-25 14:46:54,892 | INFO | LIDO/ALTERADO | MATRIZ CREDENCIAMENTO 1059 CLÍNICA AMINO.xlsm | linhas=136 | registros=544 | avisos=1

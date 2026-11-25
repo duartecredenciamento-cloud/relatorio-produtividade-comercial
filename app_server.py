@@ -9,6 +9,7 @@ import base64
 import csv
 import gzip
 import hmac
+import io
 import json
 import logging
 import mimetypes
@@ -16,6 +17,7 @@ import os
 import threading
 import time
 import webbrowser
+import zipfile
 
 import pandas as pd
 
@@ -54,6 +56,152 @@ DEFAULT_CONFIG = {
     "listen_on_lan": False,
     "port": 8765,
 }
+
+
+_DRIVE_SCOPE = ["https://www.googleapis.com/auth/drive.readonly"]
+_drive_sync_lock = threading.Lock()
+_last_drive_sync = 0.0
+
+
+def sync_drive_matrices(force=False):
+    """Mirror .xlsm files from one Google Drive folder into MATRICES_DIR.
+
+    Drive sync is opt-in: without both environment variables, local behavior is unchanged.
+    """
+    global _last_drive_sync
+    folder_id = os.environ.get("GOOGLE_DRIVE_FOLDER_ID", "").strip()
+    service_account_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
+    if not folder_id and not service_account_json:
+        return None
+    if not folder_id or not service_account_json:
+        raise RuntimeError("Configure GOOGLE_DRIVE_FOLDER_ID e GOOGLE_SERVICE_ACCOUNT_JSON juntos.")
+
+    try:
+        interval = max(60, int(os.environ.get("DRIVE_SYNC_SECONDS", "900")))
+    except ValueError as exc:
+        raise RuntimeError("DRIVE_SYNC_SECONDS precisa ser um número de segundos.") from exc
+
+    with _drive_sync_lock:
+        now = time.monotonic()
+        if not force and _last_drive_sync and now - _last_drive_sync < interval:
+            return {"enabled": True, "synced": False, "count": None}
+
+        try:
+            from google.oauth2 import service_account
+            from googleapiclient.discovery import build
+            from googleapiclient.http import MediaIoBaseDownload
+        except ImportError as exc:
+            raise RuntimeError("Dependências Google ausentes; instale o requirements.txt atualizado.") from exc
+
+        try:
+            credentials_info = json.loads(service_account_json)
+            credentials = service_account.Credentials.from_service_account_info(
+                credentials_info, scopes=_DRIVE_SCOPE
+            )
+        except Exception as exc:
+            raise RuntimeError("GOOGLE_SERVICE_ACCOUNT_JSON inválido ou incompleto.") from exc
+
+        drive = build("drive", "v3", credentials=credentials, cache_discovery=False)
+        remote_files = []
+        page_token = None
+        query = f"'{folder_id}' in parents and trashed = false"
+        while True:
+            response = drive.files().list(
+                q=query,
+                pageSize=1000,
+                pageToken=page_token,
+                fields="nextPageToken,files(id,name,mimeType,modifiedTime,size,md5Checksum)",
+                includeItemsFromAllDrives=True,
+                supportsAllDrives=True,
+            ).execute()
+            for item in response.get("files", []):
+                name = str(item.get("name", ""))
+                if item.get("mimeType") == "application/vnd.google-apps.folder":
+                    continue
+                if name.startswith("~$") or Path(name).suffix.casefold() != ".xlsm":
+                    continue
+                # Files are intentionally kept directly inside the shared folder.
+                if Path(name).name != name or name in {".", ".."} or "/" in name or "\\" in name:
+                    raise RuntimeError("A pasta do Drive contém um nome de arquivo inválido.")
+                remote_files.append(item)
+            page_token = response.get("nextPageToken")
+            if not page_token:
+                break
+
+        if not remote_files:
+            raise RuntimeError("A pasta do Google Drive não contém matrizes .xlsm acessíveis.")
+        folded_names = [str(f["name"]).casefold() for f in remote_files]
+        if len(folded_names) != len(set(folded_names)):
+            raise RuntimeError("Há nomes de matrizes repetidos na pasta do Drive; renomeie-os antes da sincronização.")
+
+        root = resolve(load_config()["matrices_dir"])
+        root.mkdir(parents=True, exist_ok=True)
+        state_path = APPDATA / "drive_sync_state.json"
+        try:
+            old_state = json.loads(state_path.read_text(encoding="utf-8"))
+            old_files = old_state.get("files", {}) if isinstance(old_state, dict) else {}
+        except (OSError, ValueError, TypeError):
+            old_files = {}
+        new_files = {}
+        current_ids = {str(item["id"]) for item in remote_files}
+        downloaded = 0
+
+        for item in remote_files:
+            file_id = str(item["id"])
+            name = str(item["name"])
+            destination = root / name
+            metadata = {
+                "name": name,
+                "modifiedTime": item.get("modifiedTime", ""),
+                "size": str(item.get("size", "")),
+                "md5Checksum": item.get("md5Checksum", ""),
+            }
+            previous = old_files.get(file_id, {})
+            if previous == metadata and destination.is_file() and destination.stat().st_size > 0:
+                new_files[file_id] = metadata
+                continue
+
+            request = drive.files().get_media(fileId=file_id, supportsAllDrives=True)
+            buffer = io.BytesIO()
+            downloader = MediaIoBaseDownload(buffer, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            content = buffer.getvalue()
+            if not content:
+                raise RuntimeError(f"A matriz {name} foi baixada vazia; os dados atuais foram preservados.")
+            try:
+                with zipfile.ZipFile(io.BytesIO(content)) as workbook:
+                    if workbook.testzip() is not None:
+                        raise ValueError("arquivo XLSM danificado")
+            except Exception as exc:
+                raise RuntimeError(f"A matriz {name} não passou na validação do arquivo; os dados atuais foram preservados.") from exc
+
+            temporary = destination.with_name(destination.name + ".drive-part")
+            temporary.write_bytes(content)
+            os.replace(temporary, destination)
+            new_files[file_id] = metadata
+            downloaded += 1
+
+        # Remove only files previously managed by this integration and removed from Drive.
+        for removed_id, old_metadata in old_files.items():
+            if removed_id in current_ids or not isinstance(old_metadata, dict):
+                continue
+            old_name = str(old_metadata.get("name", ""))
+            old_path = root / old_name
+            if old_path.parent.resolve() == root.resolve() and old_path.suffix.casefold() == ".xlsm":
+                try:
+                    old_path.unlink(missing_ok=True)
+                except OSError:
+                    logger.warning("Não foi possível remover uma matriz removida do Drive.")
+
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_tmp = state_path.with_name(state_path.name + ".tmp")
+        state_tmp.write_text(json.dumps({"files": new_files}, ensure_ascii=False), encoding="utf-8")
+        os.replace(state_tmp, state_path)
+        _last_drive_sync = time.monotonic()
+        logger.info("SINCRONIZAÇÃO GOOGLE DRIVE | matrizes=%s | baixadas=%s", len(remote_files), downloaded)
+        return {"enabled": True, "synced": True, "count": len(remote_files), "downloaded": downloaded}
 
 def load_config():
     cfg = dict(DEFAULT_CONFIG)
@@ -111,6 +259,7 @@ class DashboardStore:
             self.snapshot_cache = None
         changed = False
         cfg = load_config()
+        drive_sync = sync_drive_matrices(force=force)
         root = resolve(cfg["matrices_dir"])
         new_status = []
         any_ok = False
@@ -170,6 +319,8 @@ class DashboardStore:
             elif any_ok and not errors:
                 self.last_success=datetime.now().astimezone()
                 self.last_message=f"Leitura concluída: {len(paths)} matriz(es), {sum(x['rows'] for x in new_status)} linhas."
+                if drive_sync and drive_sync.get("synced"):
+                    self.last_message += f" Google Drive sincronizado: {drive_sync['count']} matrizes; {drive_sync['downloaded']} arquivo(s) novo(s) ou alterado(s)."
                 self.last_error=""
             elif any_ok:
                 self.last_message="Leitura parcial; os últimos dados válidos foram mantidos nos arquivos com falha."
@@ -375,7 +526,7 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             n=int(self.headers.get("Content-Length","0"));body=json.loads(self.rfile.read(min(n,20000)) or b"{}")
             if parsed.path=="/api/refresh":
-                threading.Thread(target=STORE.refresh,daemon=True).start()
+                threading.Thread(target=STORE.refresh,kwargs={"force":True},daemon=True).start()
                 return self.send_json({"ok":True,"message":"Atualização iniciada."},202)
             if parsed.path=="/api/marker":
                 STORE.mark(str(body.get("record_id","")),str(body.get("marked","")))
