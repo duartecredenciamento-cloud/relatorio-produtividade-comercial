@@ -14,10 +14,12 @@ import json
 import logging
 import mimetypes
 import os
+import secrets
 import threading
 import time
 import webbrowser
 import zipfile
+from http.cookies import SimpleCookie
 
 import pandas as pd
 
@@ -30,7 +32,7 @@ from src.rules import (SERVICES, add_responsible, calculate_pending, classify_in
 BASE = Path(__file__).resolve().parent
 DATA = BASE / "dados"
 APPDATA = Path(os.environ.get("APPDATA_DIR", str(BASE / "appdata")))
-APPDATA.mkdir(exist_ok=True)
+APPDATA.mkdir(parents=True, exist_ok=True)
 LOG = APPDATA / "atualizacoes.log"
 GOALS = APPDATA / "metas_manuais.csv"
 MARKERS = APPDATA / "marcacoes_manuais.csv"
@@ -61,6 +63,12 @@ DEFAULT_CONFIG = {
 _DRIVE_SCOPE = ["https://www.googleapis.com/auth/drive.readonly"]
 _drive_sync_lock = threading.Lock()
 _last_drive_sync = 0.0
+_SESSION_COOKIE = "duarte_session"
+_SESSION_TTL = 8 * 60 * 60
+_sessions = {}
+_sessions_lock = threading.RLock()
+_login_attempts = {}
+_login_attempts_lock = threading.Lock()
 
 
 def sync_drive_matrices(force=False):
@@ -258,13 +266,22 @@ class DashboardStore:
             self.refreshing = True
             self.snapshot_cache = None
         changed = False
-        cfg = load_config()
-        drive_sync = sync_drive_matrices(force=force)
-        root = resolve(cfg["matrices_dir"])
+        cfg = dict(DEFAULT_CONFIG)
+        drive_sync = None
+        drive_error = ""
+        roster_error = ""
+        root = BASE / "dados" / "matrizes"
         new_status = []
         any_ok = False
         errors = False
         try:
+            cfg = load_config()
+            root = resolve(cfg["matrices_dir"])
+            try:
+                drive_sync = sync_drive_matrices(force=force)
+            except Exception as exc:
+                drive_error = f"Google Drive: {type(exc).__name__}: {exc}"
+                logger.exception("SINCRONIZAÇÃO GOOGLE DRIVE INDISPONÍVEL")
             if not root.is_dir():
                 raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
             paths = list_matrix_files(root)
@@ -274,7 +291,8 @@ class DashboardStore:
                     del self.matrix_cache[removed]
                     changed = True
                     logger.info("REMOVIDO | %s", removed)
-            for p in paths:
+            for matrix_index, p in enumerate(paths, start=1):
+                logger.info("LENDO MATRIZ %s/%s | %s", matrix_index, len(paths), p.name)
                 key = str(p.resolve())
                 prev = self.matrix_cache.get(key)
                 try:
@@ -311,21 +329,27 @@ class DashboardStore:
                     changed = True
                     logger.info("CADASTRO ATUALIZADO | %s | registros=%s",roster_path.name,len(roster))
             except Exception as exc:
-                self.last_error=f"Cadastro de responsáveis: {exc}"
+                roster_error=f"Cadastro de responsáveis: {exc}"
+                new_status.append({"name":roster_path.name,"state":"Falha no cadastro; responsáveis anteriores preservados","rows":0,"error":roster_error,"warnings":[]})
                 logger.warning("CADASTRO PRESERVADO | %s",exc)
             self.file_status=new_status
             if not paths:
                 self.last_message="Nenhuma matriz .xlsm encontrada; confira a pasta configurada."
+                self.last_error=" | ".join(x for x in (drive_error,roster_error) if x)
             elif any_ok and not errors:
                 self.last_success=datetime.now().astimezone()
                 self.last_message=f"Leitura concluída: {len(paths)} matriz(es), {sum(x['rows'] for x in new_status)} linhas."
                 if drive_sync and drive_sync.get("synced"):
                     self.last_message += f" Google Drive sincronizado: {drive_sync['count']} matrizes; {drive_sync['downloaded']} arquivo(s) novo(s) ou alterado(s)."
-                self.last_error=""
+                elif drive_sync and drive_sync.get("enabled") and not drive_sync.get("synced"):
+                    self.last_message += " Próxima verificação do Google Drive no intervalo configurado."
+                self.last_error=" | ".join(x for x in (drive_error,roster_error) if x)
             elif any_ok:
                 self.last_message="Leitura parcial; os últimos dados válidos foram mantidos nos arquivos com falha."
+                self.last_error=" | ".join(x for x in (drive_error,roster_error) if x)
             else:
                 self.last_message="Nenhum arquivo pôde ser lido; os dados anteriores permanecem disponíveis."
+                self.last_error=" | ".join(x for x in (drive_error,roster_error) if x)
             if self.last_error:
                 self.last_message += " " + self.last_error
             if changed or self.last_date_rebuild != date.today():
@@ -454,7 +478,7 @@ class DashboardStore:
             for _,r in quality.iterrows():
                 quality_rows.append({"type":str(r.get("tipo") or "Alerta"),"client":str(r.get("cliente") or ""),"operator":str(r.get("operadora") or ""),"service":str(r.get("serviço") or ""),"status":str(r.get("status") or ""),"lastContact":iso(r.get("último_contato")),"source":str(r.get("fonte") or ""),"detail":str(r.get("detalhe") or "")})
         updated=last_success.isoformat(timespec="seconds") if last_success else None
-        response={"mode":"live","statusLabel":"ATUALIZAÇÃO EM ANDAMENTO" if refreshing else ("FONTE LOCAL · COM AVISOS" if last_error or any(f.get("error") for f in file_status) else "FONTE LOCAL · MATRIZES"),"statusMessage":message,"updatedAt":updated,"referenceDate":now.isoformat(),"kpis":{"active":len(active),"inactive":int(records.status.map(is_inactive).sum()) if not records.empty else 0,"completed":len(completed),"inProgress":len(active)-len(completed),"pending":len(pending),"owners":len({x["name"] for x in owner_groups if x["name"]!="Responsável não identificado"}),"unassigned":sum(x["name"]=="Responsável não identificado" for x in owner_groups),"completionRate":round(len(completed)/len(active)*100) if len(active) else 0,"markerReview":sum(x["marker"]=="Revisar" for x in mapped)},"services":services,"processes":mapped,"pendingRecords":pending_mapped,"owners":owner_groups,"priorities":priorities,"indicators":indicator_counts,"quality":quality_rows,"qualitySummary":qrecords,"fileStatus":file_status,"filterOptions":all_opts,"config":{"pendingDays":cfg["pending_days"],"pendingRedDays":cfg.get("pending_red_days",10),"refreshSeconds":cfg["refresh_seconds"],"staleContactDays":cfg["stale_contact_days"]},"duplicates":duplicate_count}
+        response={"mode":"live","statusLabel":"ATUALIZAÇÃO EM ANDAMENTO" if refreshing else ("MATRIZES · COM AVISOS" if last_error or any(f.get("error") for f in file_status) else "MATRIZES · ATUALIZADAS"),"statusMessage":message,"updatedAt":updated,"referenceDate":now.isoformat(),"kpis":{"active":len(active),"inactive":int(records.status.map(is_inactive).sum()) if not records.empty else 0,"completed":len(completed),"inProgress":len(active)-len(completed),"pending":len(pending),"owners":len({x["name"] for x in owner_groups if x["name"]!="Responsável não identificado"}),"unassigned":sum(x["name"]=="Responsável não identificado" for x in owner_groups),"completionRate":round(len(completed)/len(active)*100) if len(active) else 0,"markerReview":sum(x["marker"]=="Revisar" for x in mapped)},"services":services,"processes":mapped,"pendingRecords":pending_mapped,"owners":owner_groups,"priorities":priorities,"indicators":indicator_counts,"quality":quality_rows,"qualitySummary":qrecords,"fileStatus":file_status,"filterOptions":all_opts,"config":{"pendingDays":cfg["pending_days"],"pendingRedDays":cfg.get("pending_red_days",10),"refreshSeconds":cfg["refresh_seconds"],"staleContactDays":cfg["stale_contact_days"]},"duplicates":duplicate_count}
         if cacheable:
             with self.lock:
                 if not self.refreshing:
@@ -488,43 +512,108 @@ STORE=DashboardStore()
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self,*args,**kwargs):super().__init__(*args,directory=str(BASE),**kwargs)
     def log_message(self,fmt,*args):logger.info("HTTP | %s",fmt%args)
-    def send_json(self,obj,status=200):
+    def _secure_cookie(self):
+        return os.environ.get("PORT") is not None or self.headers.get("X-Forwarded-Proto", "").split(",")[0].strip().casefold()=="https"
+    def _cookie_token(self):
+        jar=SimpleCookie()
+        try: jar.load(self.headers.get("Cookie", ""))
+        except Exception: return ""
+        return jar.get(_SESSION_COOKIE).value if jar.get(_SESSION_COOKIE) else ""
+    def has_session(self):
+        token=self._cookie_token()
+        if not token:return False
+        now=time.time()
+        with _sessions_lock:
+            session=_sessions.get(token)
+            if not session:return False
+            if session["expires"]<=now:
+                _sessions.pop(token,None)
+                return False
+            return True
+    def _auth_configured(self):
+        return bool(os.environ.get("DASHBOARD_USER", "") and os.environ.get("DASHBOARD_PASSWORD", ""))
+    def send_json(self,obj,status=200,headers=None):
         data=json.dumps(obj,ensure_ascii=False,default=str).encode("utf-8")
         compressed="gzip" in self.headers.get("Accept-Encoding","").lower()
         if compressed:data=gzip.compress(data,compresslevel=5)
-        self.send_response(status);self.send_header("Content-Type","application/json; charset=utf-8");self.send_header("Content-Length",str(len(data)));self.send_header("Cache-Control","no-store")
+        self.send_response(status);self.send_header("Content-Type","application/json; charset=utf-8");self.send_header("Content-Length",str(len(data)));self.send_header("Cache-Control","no-store, max-age=0");self.send_header("Pragma","no-cache");self.send_header("X-Content-Type-Options","nosniff")
         if compressed:self.send_header("Content-Encoding","gzip");self.send_header("Vary","Accept-Encoding")
+        if headers:
+            for key,value in headers.items():self.send_header(key,value)
         self.end_headers();self.wfile.write(data)
+    def send_file(self,relative):
+        path=(BASE/relative).resolve()
+        if not path.is_file() or BASE not in path.parents:return self.send_json({"error":"Recurso não encontrado."},404)
+        payload=path.read_bytes(); mime=mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        self.send_response(200);self.send_header("Content-Type",mime+("; charset=utf-8" if mime.startswith("text/") or "javascript" in mime else ""));self.send_header("Content-Length",str(len(payload)));self.send_header("Cache-Control","no-store, max-age=0");self.send_header("Pragma","no-cache");self.send_header("X-Content-Type-Options","nosniff");self.send_header("Referrer-Policy","strict-origin-when-cross-origin");self.send_header("X-Frame-Options","DENY");self.send_header("Content-Security-Policy","default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'");self.end_headers();self.wfile.write(payload)
     def authorize(self):
-        if not os.environ.get("PORT") and os.environ.get("REQUIRE_AUTH","").casefold() not in {"1","true","yes"}:
-            return True
-        user=os.environ.get("DASHBOARD_USER","")
-        password=os.environ.get("DASHBOARD_PASSWORD","")
-        if not user or not password:
-            self.send_json({"error":"Configure DASHBOARD_USER e DASHBOARD_PASSWORD como variáveis privadas do serviço."},503)
+        if not self._auth_configured():
+            self.send_json({"error":"Acesso indisponível: configure DASHBOARD_USER e DASHBOARD_PASSWORD como variáveis privadas do serviço."},503)
             return False
-        expected="Basic "+base64.b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
-        if hmac.compare_digest(self.headers.get("Authorization", ""),expected):
-            return True
-        self.send_response(401);self.send_header("WWW-Authenticate",'Basic realm="Painel Duarte", charset="UTF-8"');self.send_header("Content-Length","0");self.end_headers()
+        if self.has_session():return True
+        self.send_json({"error":"Sessão encerrada. Entre novamente."},401)
         return False
     def do_GET(self):
         parsed=urlparse(self.path)
         if parsed.path=="/api/health":return self.send_json({"ok":True,"refreshing":STORE.refreshing,"updatedAt":STORE.last_success.isoformat(timespec="seconds") if STORE.last_success else None})
+        if parsed.path=="/login":
+            if self.has_session():
+                self.send_response(303);self.send_header("Location","/");self.send_header("Cache-Control","no-store, max-age=0");self.end_headers();return
+            return self.send_file("login.html")
+        if parsed.path in {"/assets/login.css","/assets/login.js","/assets/brand-logo.png"}:
+            return self.send_file(parsed.path.lstrip("/"))
+        if parsed.path=="/":
+            if not self.has_session():
+                self.send_response(303);self.send_header("Location","/login");self.send_header("Cache-Control","no-store, max-age=0");self.end_headers();return
+            if not self._auth_configured():return self.send_json({"error":"Credenciais do painel não configuradas."},503)
+            return self.send_file("index.html")
         if not self.authorize():return
+        if parsed.path=="/api/session":return self.send_json({"authenticated":True})
         if parsed.path=="/api/dashboard":return self.send_json(STORE.snapshot(parse_qs(parsed.query)))
-        relative="index.html" if parsed.path=="/" else parsed.path.lstrip("/")
-        allowed={"index.html","assets/styles.css","assets/app.css","assets/data-service.js","assets/app.js","assets/brand-logo.png"}
+        allowed={"assets/styles.css","assets/app.css","assets/data-service.js","assets/app.js"}
+        relative=parsed.path.lstrip("/")
         if relative not in allowed:return self.send_json({"error":"Recurso não encontrado."},404)
-        path=(BASE/relative).resolve()
-        if not path.is_file() or BASE not in path.parents:return self.send_json({"error":"Recurso não encontrado."},404)
-        payload=path.read_bytes(); mime=mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-        self.send_response(200);self.send_header("Content-Type",mime+ ("; charset=utf-8" if mime.startswith("text/") or "javascript" in mime else ""));self.send_header("Content-Length",str(len(payload)));self.send_header("X-Content-Type-Options","nosniff");self.end_headers();self.wfile.write(payload)
+        return self.send_file(relative)
+    def login(self):
+        if not self._auth_configured():
+            return self.send_json({"error":"Configure DASHBOARD_USER e DASHBOARD_PASSWORD como variáveis privadas do serviço."},503)
+        ip=self.client_address[0]
+        now=time.time()
+        with _login_attempts_lock:
+            attempts=[stamp for stamp in _login_attempts.get(ip,[]) if now-stamp<900]
+            _login_attempts[ip]=attempts
+            if len(attempts)>=10:return self.send_json({"error":"Muitas tentativas. Aguarde 15 minutos e tente novamente."},429)
+        try:
+            n=int(self.headers.get("Content-Length","0"))
+            if n<=0 or n>4000:return self.send_json({"error":"Dados de acesso inválidos."},400)
+            body=json.loads(self.rfile.read(n))
+            username=str(body.get("username",""))[:256]
+            password=str(body.get("password",""))[:1024]
+        except Exception:
+            return self.send_json({"error":"Dados de acesso inválidos."},400)
+        ok=hmac.compare_digest(username,os.environ.get("DASHBOARD_USER","")) and hmac.compare_digest(password,os.environ.get("DASHBOARD_PASSWORD",""))
+        if not ok:
+            with _login_attempts_lock:_login_attempts[ip].append(now)
+            return self.send_json({"error":"Usuário ou senha incorretos."},401)
+        with _login_attempts_lock:_login_attempts.pop(ip,None)
+        token=secrets.token_urlsafe(32)
+        with _sessions_lock:_sessions[token]={"expires":now+_SESSION_TTL}
+        secure="; Secure" if self._secure_cookie() else ""
+        cookie=f"{_SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={_SESSION_TTL}{secure}"
+        return self.send_json({"ok":True},200,{"Set-Cookie":cookie})
     def do_POST(self):
         parsed=urlparse(self.path)
+        if parsed.path=="/api/login":return self.login()
+        if parsed.path=="/api/logout":
+            token=self._cookie_token()
+            with _sessions_lock:_sessions.pop(token,None)
+            secure="; Secure" if self._secure_cookie() else ""
+            return self.send_json({"ok":True},200,{"Set-Cookie":f"{_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0{secure}"})
         if not self.authorize():return
         try:
-            n=int(self.headers.get("Content-Length","0"));body=json.loads(self.rfile.read(min(n,20000)) or b"{}")
+            n=int(self.headers.get("Content-Length","0"))
+            if n<0 or n>20000:return self.send_json({"error":"Requisição muito grande."},413)
+            body=json.loads(self.rfile.read(n) or b"{}")
             if parsed.path=="/api/refresh":
                 threading.Thread(target=STORE.refresh,kwargs={"force":True},daemon=True).start()
                 return self.send_json({"ok":True,"message":"Atualização iniciada."},202)
@@ -556,6 +645,8 @@ def main():
     threading.Thread(target=STORE.refresh,daemon=True).start()
     threading.Thread(target=refresh_loop,daemon=True).start()
     print(f"Painel Duarte iniciado em {host}:{port}")
+    if not (os.environ.get("DASHBOARD_USER") and os.environ.get("DASHBOARD_PASSWORD")):
+        print("ATENÇÃO: configure DASHBOARD_USER e DASHBOARD_PASSWORD para liberar o acesso pela tela de login.")
     print("A leitura inicial das matrizes está em andamento. Deixe esta janela aberta.")
     print("Para encerrar, pressione Ctrl+C.")
     if os.environ.get("DUARTE_NO_BROWSER")!="1":threading.Timer(1.2,lambda:webbrowser.open(url)).start()

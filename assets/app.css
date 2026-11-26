@@ -29,3 +29,5 @@
 .quality-card[data-quality-type]{width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer}
 .quality-card[data-quality-type]:hover,.quality-card[data-quality-type][aria-pressed="true"]{border-color:#40bde877;background:#40bde80c}
 .service-pill.filter-row,.status-pill.filter-row{cursor:pointer}
+
+.profile-logout{margin-left:auto;padding:5px 8px;border:1px solid #ff6c7c44;border-radius:6px;background:#ff6c7c10;color:#ffb0ba;font-size:8px;cursor:pointer}.profile-logout:hover{background:#ff6c7c22;border-color:#ff6c7c88}.profile-logout:focus-visible{outline:2px solid #40bde8;outline-offset:2px}

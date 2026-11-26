@@ -1,45 +1,23 @@
-INTEGRAÇÃO AUTOMÁTICA COM GOOGLE DRIVE — DUARTE
+DUARTE · PRODUTIVIDADE COMERCIAL — ENTREGA CONSOLIDADA
 
-O pacote contém apenas os arquivos de código/configuração. Não contém matrizes,
-planilhas de clientes, chave de serviço ou qualquer segredo.
+INCLUI
+- Aplicação e interface completas.
+- Tela própria de login, sessão protegida, logout e retorno seguro ao login.
+- Sincronização opcional com Google Drive no Railway, sem enviar arquivos de clientes ao Git.
+- Filtros interativos, leitura de matrizes, regras comerciais, testes e guias de execução.
 
-APLICAR NO REPOSITÓRIO
-1. Faça uma cópia de segurança do app_server.py atual.
-2. Substitua o app_server.py da raiz pelo deste pacote.
-3. Acrescente ao requirements.txt as duas dependências Google incluídas aqui
-   (ou substitua o requirements.txt pelo deste pacote, se ele ainda tiver somente
-   pandas e openpyxl).
-4. Não copie planilhas, appdata, __pycache__ nem credenciais para o Git.
-5. Confira `git status`, faça commit e push para iniciar novo deploy.
+DADOS SENSÍVEIS
+O pacote foi montado sem matrizes, cadastro de responsáveis, logs, senhas ou chave de serviço. No Windows, acrescente os arquivos de dados localmente. No Railway, use o volume privado `/data` e as variáveis privadas descritas no README.
 
-CONFIGURAR O GOOGLE CLOUD E O DRIVE
-1. Em um projeto Google Cloud autorizado pela empresa, habilite Google Drive API.
-2. Crie uma conta de serviço e gere uma chave JSON. Guarde-a como segredo; não a
-   envie pelo chat e não a salve no repositório.
-3. Compartilhe a pasta oficial que contém as matrizes diretamente com o e-mail da
-   conta de serviço, com permissão de Leitor. O escopo usado pelo código também é
-   somente leitura.
-4. Copie o ID da pasta da URL do Drive, após `/folders/`.
+PRIMEIRO USO LOCAL
+1. Extraia o pacote para uma pasta de trabalho.
+2. Execute instalar.bat.
+3. Garanta que a unidade oficial do Drive esteja montada e que o cadastro de responsáveis esteja disponível.
+4. Abra PowerShell nessa pasta e execute: `powershell -ExecutionPolicy Bypass -File .\iniciar.ps1`.
+5. Informe um usuário e senha próprios do painel (não use a senha das matrizes).
 
-CONFIGURAR NO RAILWAY (variáveis privadas)
-GOOGLE_DRIVE_FOLDER_ID = ID da pasta oficial
-GOOGLE_SERVICE_ACCOUNT_JSON = conteúdo completo da chave JSON em uma linha
-MATRICES_DIR = /data/matrizes
-APPDATA_DIR = /data/appdata
-DRIVE_SYNC_SECONDS = 900
+RAILWAY
+Antes de divulgar o link, configure o volume, as credenciais DASHBOARD_USER/DASHBOARD_PASSWORD e a conta de serviço Google Drive; veja o README.md. Sem essas credenciais Google, a aplicação ainda pode servir dados já presentes no volume, mas não sincronizará novas matrizes.
 
-Mantenha um volume Railway montado em `/data` para os dados locais e ajustes
-manuais persistirem após reinícios. A pasta do Drive deve conter as matrizes XLSM
-diretamente, sem subpastas. O serviço baixa arquivos no início, verifica mudanças
-aproximadamente a cada 15 minutos e o botão Atualizar agora força uma nova
-verificação. Só baixa arquivos alterados e preserva os dados em caso de falha.
-
-SEGURANÇA E VALIDAÇÃO
-- Não use a chave JSON no GitHub, em arquivo .env commitado, nem em mensagens.
-- Não publique matrizes em repositório Git; a sincronização usa a API do Drive.
-- Depois do deploy, confira no painel a mensagem “Google Drive sincronizado” e
-  valide o horário/quantidade de matrizes antes de compartilhar o link com a equipe.
-- Se a pasta for uma unidade compartilhada, adicione a conta de serviço como
-  membro/leitor e confirme que a política da organização permite essa integração.
-- A integração não foi testada com as credenciais da sua empresa; o acesso real
-  depende de habilitar a API, compartilhar a pasta e configurar as variáveis acima.
+VALIDAÇÃO
+`python -m unittest discover -s tests -v`

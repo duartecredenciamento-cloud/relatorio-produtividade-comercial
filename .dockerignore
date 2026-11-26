@@ -1,0 +1,11 @@
+**/__pycache__
+**/*.py[cod]
+.venv
+.git
+.env
+*.log
+appdata
+dados
+*.xlsx
+*.xlsm
+service-account*.json
