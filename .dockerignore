@@ -1,11 +1,7 @@
-**/__pycache__
-**/*.py[cod]
-.venv
 .git
-.env
-*.log
+__pycache__
+*.py[cod]
 appdata
-dados
-*.xlsx
-*.xlsm
-service-account*.json
+dados/matrizes
+dados/*.xlsx
+.env

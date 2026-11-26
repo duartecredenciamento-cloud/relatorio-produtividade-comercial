@@ -31,12 +31,12 @@ class RuleTests(unittest.TestCase):
 
     def test_official_priority_overrides(self):
         records = pd.DataFrame([
-            {"client": "CLIENTE TESTE", "priority": "CREDENCIAMENTO"},
-            {"client": "CLIENTE TESTE", "priority": "META CREDENCIAMENTO"},
-            {"client": "CLIENTE TESTE", "priority": "REAJUSTE"},
+            {"client": "FISIO LIFE", "priority": "CREDENCIAMENTO"},
+            {"client": "FISIO LIFE", "priority": "META CREDENCIAMENTO"},
+            {"client": "FISIO LIFE", "priority": "REAJUSTE"},
         ])
         roster = pd.DataFrame([
-            {"client": "CLIENTE TESTE", "responsible": "Dulcineia", "priority": "Todas as PRIORIDADES, com exceção CREDENCIAMENTO e META CREDENCIAMENTO"},
+            {"client": "FISIO LIFE", "responsible": "Dulcineia", "priority": "Todas as PRIORIDADES, com exceção CREDENCIAMENTO e META CREDENCIAMENTO"},
             {"client": "TODOS OS CLIENTES", "responsible": "Felipe", "priority": "CREDENCIAMENTO"},
             {"client": "TODOS OS CLIENTES", "responsible": "Niziane", "priority": "META CREDENCIAMENTO"},
         ])

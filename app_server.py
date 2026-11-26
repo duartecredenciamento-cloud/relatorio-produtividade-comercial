@@ -9,11 +9,13 @@ import base64
 import csv
 import gzip
 import hmac
+import hashlib
 import io
 import json
 import logging
 import mimetypes
 import os
+import re
 import secrets
 import threading
 import time
@@ -69,6 +71,9 @@ _sessions = {}
 _sessions_lock = threading.RLock()
 _login_attempts = {}
 _login_attempts_lock = threading.Lock()
+_accounts_lock = threading.RLock()
+_ACCOUNTS_FILE = APPDATA / "accounts.json"
+_PASSWORD_ITERATIONS = 310_000
 
 
 def sync_drive_matrices(force=False):
@@ -532,6 +537,40 @@ class Handler(SimpleHTTPRequestHandler):
             return True
     def _auth_configured(self):
         return bool(os.environ.get("DASHBOARD_USER", "") and os.environ.get("DASHBOARD_PASSWORD", ""))
+    def _accounts(self):
+        try:
+            data = json.loads(_ACCOUNTS_FILE.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+        except FileNotFoundError:
+            return {}
+        except (OSError, ValueError, TypeError) as exc:
+            logger.error("Cadastro de contas indisponível; nenhuma conta nova será criada.")
+            raise RuntimeError("Cadastro de contas indisponível. Peça ao administrador para verificar o armazenamento persistente.") from exc
+    def _password_matches(self, stored, password):
+        try:
+            salt = bytes.fromhex(stored["salt"])
+            expected = bytes.fromhex(stored["hash"])
+            actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, int(stored["iterations"]))
+            return hmac.compare_digest(actual, expected)
+        except (KeyError, TypeError, ValueError):
+            return False
+    def _valid_login(self, username, password):
+        admin_user = os.environ.get("DASHBOARD_USER", "")
+        admin_password = os.environ.get("DASHBOARD_PASSWORD", "")
+        admin_match = bool(admin_user and admin_password and hmac.compare_digest(username, admin_user) and hmac.compare_digest(password, admin_password))
+        if admin_match:
+            return True
+        with _accounts_lock:
+            account = self._accounts().get(username)
+        return bool(account and self._password_matches(account, password))
+    def _rate_limited(self, ip, now):
+        with _login_attempts_lock:
+            attempts = [stamp for stamp in _login_attempts.get(ip, []) if now - stamp < 900]
+            _login_attempts[ip] = attempts
+            return len(attempts) >= 10
+    def _failed_attempt(self, ip, now):
+        with _login_attempts_lock:
+            _login_attempts.setdefault(ip, []).append(now)
     def send_json(self,obj,status=200,headers=None):
         data=json.dumps(obj,ensure_ascii=False,default=str).encode("utf-8")
         compressed="gzip" in self.headers.get("Accept-Encoding","").lower()
@@ -579,10 +618,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json({"error":"Configure DASHBOARD_USER e DASHBOARD_PASSWORD como variáveis privadas do serviço."},503)
         ip=self.client_address[0]
         now=time.time()
-        with _login_attempts_lock:
-            attempts=[stamp for stamp in _login_attempts.get(ip,[]) if now-stamp<900]
-            _login_attempts[ip]=attempts
-            if len(attempts)>=10:return self.send_json({"error":"Muitas tentativas. Aguarde 15 minutos e tente novamente."},429)
+        if self._rate_limited(ip, now):
+            return self.send_json({"error":"Muitas tentativas. Aguarde 15 minutos e tente novamente."},429)
         try:
             n=int(self.headers.get("Content-Length","0"))
             if n<=0 or n>4000:return self.send_json({"error":"Dados de acesso inválidos."},400)
@@ -591,19 +628,75 @@ class Handler(SimpleHTTPRequestHandler):
             password=str(body.get("password",""))[:1024]
         except Exception:
             return self.send_json({"error":"Dados de acesso inválidos."},400)
-        ok=hmac.compare_digest(username,os.environ.get("DASHBOARD_USER","")) and hmac.compare_digest(password,os.environ.get("DASHBOARD_PASSWORD",""))
+        try:
+            ok = self._valid_login(username, password)
+        except RuntimeError as exc:
+            return self.send_json({"error":str(exc)},503)
         if not ok:
-            with _login_attempts_lock:_login_attempts[ip].append(now)
+            self._failed_attempt(ip, now)
             return self.send_json({"error":"Usuário ou senha incorretos."},401)
         with _login_attempts_lock:_login_attempts.pop(ip,None)
         token=secrets.token_urlsafe(32)
-        with _sessions_lock:_sessions[token]={"expires":now+_SESSION_TTL}
+        with _sessions_lock:_sessions[token]={"expires":now+_SESSION_TTL,"username":username}
         secure="; Secure" if self._secure_cookie() else ""
         cookie=f"{_SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={_SESSION_TTL}{secure}"
         return self.send_json({"ok":True},200,{"Set-Cookie":cookie})
+    def register(self):
+        if not self._auth_configured():
+            return self.send_json({"error":"O administrador precisa configurar as credenciais do painel antes do cadastro."},503)
+        invite = os.environ.get("DASHBOARD_INVITE_CODE", "")
+        if not invite:
+            return self.send_json({"error":"Cadastro fechado. Peça ao administrador um código de convite e a liberação do cadastro."},403)
+        ip = self.client_address[0]
+        now = time.time()
+        if self._rate_limited(ip, now):
+            return self.send_json({"error":"Muitas tentativas. Aguarde 15 minutos e tente novamente."},429)
+        try:
+            n = int(self.headers.get("Content-Length", "0"))
+            if n <= 0 or n > 4000:
+                return self.send_json({"error":"Dados de cadastro inválidos."},400)
+            body = json.loads(self.rfile.read(n))
+            username = str(body.get("username", "")).strip()
+            password = str(body.get("password", ""))
+            supplied_invite = str(body.get("inviteCode", ""))
+        except Exception:
+            return self.send_json({"error":"Dados de cadastro inválidos."},400)
+        if not hmac.compare_digest(supplied_invite, invite):
+            self._failed_attempt(ip, now)
+            return self.send_json({"error":"Código de convite inválido."},403)
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{2,31}", username):
+            return self.send_json({"error":"O usuário deve ter 3 a 32 caracteres: letras, números, ponto, hífen ou sublinhado."},400)
+        if len(password) < 12 or len(password) > 1024:
+            return self.send_json({"error":"A senha precisa ter pelo menos 12 caracteres."},400)
+        if hmac.compare_digest(username.casefold(), os.environ.get("DASHBOARD_USER", "").casefold()):
+            return self.send_json({"error":"Esse usuário está reservado ao administrador."},409)
+        salt = secrets.token_bytes(16)
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, _PASSWORD_ITERATIONS)
+        account = {"salt":salt.hex(),"hash":digest.hex(),"iterations":_PASSWORD_ITERATIONS,"created_at":datetime.now().astimezone().isoformat(timespec="seconds")}
+        try:
+            with _accounts_lock:
+                accounts = self._accounts()
+                if username in accounts or any(k.casefold() == username.casefold() for k in accounts):
+                    return self.send_json({"error":"Não foi possível criar a conta com esses dados. Verifique o usuário ou fale com o administrador."},409)
+                accounts[username] = account
+                _ACCOUNTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+                tmp = _ACCOUNTS_FILE.with_name(_ACCOUNTS_FILE.name + ".tmp")
+                tmp.write_text(json.dumps(accounts, ensure_ascii=False), encoding="utf-8")
+                try: os.chmod(tmp, 0o600)
+                except OSError: pass
+                os.replace(tmp, _ACCOUNTS_FILE)
+        except RuntimeError as exc:
+            return self.send_json({"error":str(exc)},503)
+        token = secrets.token_urlsafe(32)
+        with _sessions_lock:_sessions[token]={"expires":now+_SESSION_TTL,"username":username}
+        secure="; Secure" if self._secure_cookie() else ""
+        cookie=f"{_SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={_SESSION_TTL}{secure}"
+        with _login_attempts_lock:_login_attempts.pop(ip,None)
+        return self.send_json({"ok":True},201,{"Set-Cookie":cookie})
     def do_POST(self):
         parsed=urlparse(self.path)
         if parsed.path=="/api/login":return self.login()
+        if parsed.path=="/api/register":return self.register()
         if parsed.path=="/api/logout":
             token=self._cookie_token()
             with _sessions_lock:_sessions.pop(token,None)

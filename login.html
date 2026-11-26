@@ -33,7 +33,7 @@
         <div class="mobile-brand"><img src="/assets/brand-logo.png" alt="Duarte"><span>PRODUTIVIDADE COMERCIAL</span></div>
         <div class="form-eyebrow"><span class="shield" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3 19 6v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg></span> ÁREA SEGURA</div>
         <h2 id="loginTitle">Bem-vindo de volta<span>.</span></h2>
-        <p class="form-intro">Entre com suas credenciais para acessar o painel.</p>
+        <p class="form-intro" id="formIntro">Entre com suas credenciais para acessar o painel.</p>
 
         <form id="loginForm" novalidate>
           <label for="username">Usuário</label>
@@ -52,8 +52,19 @@
           <div class="error-message" id="loginError" role="alert" aria-live="polite" hidden></div>
           <button class="submit-button" id="submitButton" type="submit"><span class="button-label">Entrar no painel</span><span class="button-arrow" aria-hidden="true">→</span><span class="button-spinner" aria-hidden="true"></span></button>
         </form>
+        <form id="registerForm" novalidate hidden>
+          <label for="newUsername">Novo usuário</label>
+          <div class="input-wrap"><svg class="field-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><input id="newUsername" name="username" type="text" autocomplete="username" minlength="3" maxlength="32" placeholder="Escolha um usuário" required></div>
+          <div class="password-label"><label for="newPassword">Senha</label><span>Mínimo de 12 caracteres</span></div>
+          <div class="input-wrap"><svg class="field-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/></svg><input id="newPassword" name="password" type="password" autocomplete="new-password" minlength="12" maxlength="1024" placeholder="Crie uma senha forte" required></div>
+          <div class="password-label invite-label"><label for="inviteCode">Código de convite</label><span>Solicite ao administrador</span></div>
+          <div class="input-wrap"><svg class="field-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><input id="inviteCode" name="inviteCode" type="password" autocomplete="off" placeholder="Código fornecido pelo administrador" required></div>
+          <button class="submit-button" id="registerButton" type="submit"><span class="button-label">Criar minha conta</span><span class="button-arrow" aria-hidden="true">→</span><span class="button-spinner" aria-hidden="true"></span></button>
+        </form>
+        <div class="error-message" id="authError" role="alert" aria-live="polite" hidden></div>
+        <button class="auth-switch" id="authSwitch" type="button">Ainda não tem acesso? Criar conta com convite</button>
 
-        <div class="access-note"><span class="note-dot"></span><span>Este painel é destinado a usuários autorizados.</span></div>
+        <div class="access-note"><span class="note-dot"></span><span>O cadastro requer código de convite e autorização do administrador.</span></div>
         <div class="form-footer"><span>DUARTE</span><span>PRODUTIVIDADE COMERCIAL</span><span>·</span><span>ACESSO PRIVADO</span></div>
       </div>
     </section>

@@ -1,11 +1,14 @@
 (() => {
-  const form = document.getElementById('loginForm');
+  const loginForm = document.getElementById('loginForm');
+  const registerForm = document.getElementById('registerForm');
   const username = document.getElementById('username');
   const password = document.getElementById('password');
-  const error = document.getElementById('loginError');
-  const submit = document.getElementById('submitButton');
+  const error = document.getElementById('authError');
   const toggle = document.getElementById('togglePassword');
-
+  const switcher = document.getElementById('authSwitch');
+  const title = document.getElementById('loginTitle');
+  const intro = document.getElementById('formIntro');
+  let registering = false;
   toggle.addEventListener('click', () => {
     const show = password.type === 'password';
     password.type = show ? 'text' : 'password';
@@ -13,49 +16,35 @@
     toggle.setAttribute('aria-label', show ? 'Ocultar senha' : 'Mostrar senha');
     password.focus();
   });
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
+  switcher.addEventListener('click', () => {
+    registering = !registering;
+    loginForm.hidden = registering;
+    registerForm.hidden = !registering;
     error.hidden = true;
-    const userValue = username.value.trim();
-    const passwordValue = password.value;
-    if (!userValue || !passwordValue) {
-      error.textContent = 'Preencha o usuário e a senha para continuar.';
-      error.hidden = false;
-      (!userValue ? username : password).focus();
-      return;
-    }
-
-    submit.disabled = true;
-    submit.classList.add('is-loading');
-    submit.setAttribute('aria-busy', 'true');
+    title.innerHTML = registering ? 'Criar seu acesso<span>.</span>' : 'Bem-vindo de volta<span>.</span>';
+    intro.textContent = registering ? 'Use o código de convite fornecido pelo administrador.' : 'Entre com suas credenciais para acessar o painel.';
+    switcher.textContent = registering ? 'Já tem uma conta? Entrar' : 'Ainda não tem acesso? Criar conta com convite';
+    (registering ? document.getElementById('newUsername') : username).focus();
+  });
+  async function submit(form, endpoint, button, payload) {
+    error.hidden = true;
+    if (!form.reportValidity()) return;
+    button.disabled = true; button.classList.add('is-loading'); button.setAttribute('aria-busy', 'true');
     try {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        credentials: 'same-origin',
-        cache: 'no-store',
-        body: JSON.stringify({ username: userValue, password: passwordValue })
-      });
-      let result = {};
-      try { result = await response.json(); } catch (_) { /* resposta vazia */ }
-      if (!response.ok) {
-        error.textContent = response.status === 401
-          ? 'Usuário ou senha incorretos. Confira os dados e tente novamente.'
-          : (result.error || 'Não foi possível iniciar a sessão. Tente novamente em instantes.');
-        error.hidden = false;
-        password.value = '';
-        password.focus();
-        return;
-      }
+      const response = await fetch(endpoint, {method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},credentials:'same-origin',cache:'no-store',body:JSON.stringify(payload)});
+      let result = {}; try { result = await response.json(); } catch (_) {}
+      if (!response.ok) { error.textContent = result.error || 'Não foi possível concluir. Tente novamente.'; error.hidden = false; return; }
       window.location.replace('/');
-    } catch (_) {
-      error.textContent = 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.';
-      error.hidden = false;
-    } finally {
-      submit.disabled = false;
-      submit.classList.remove('is-loading');
-      submit.removeAttribute('aria-busy');
-    }
+    } catch (_) { error.textContent = 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'; error.hidden = false; }
+    finally { button.disabled = false; button.classList.remove('is-loading'); button.removeAttribute('aria-busy'); }
+  }
+  loginForm.addEventListener('submit', event => {
+    event.preventDefault();
+    if (!username.value.trim() || !password.value) { error.textContent='Preencha usuário e senha.'; error.hidden=false; return; }
+    submit(loginForm, '/api/login', document.getElementById('submitButton'), {username:username.value.trim(),password:password.value});
+  });
+  registerForm.addEventListener('submit', event => {
+    event.preventDefault();
+    submit(registerForm, '/api/register', document.getElementById('registerButton'), {username:document.getElementById('newUsername').value.trim(),password:document.getElementById('newPassword').value,inviteCode:document.getElementById('inviteCode').value});
   });
 })();
