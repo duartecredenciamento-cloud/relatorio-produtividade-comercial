@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import pandas as pd
 
 from src.rules import (add_responsible, calculate_pending, classify_indicator_records,
-                       is_active, is_inactive, is_card_or_partnership, norm_key)
+                       is_active, is_inactive, is_card_or_partnership, make_quality, norm_key)
 
 
 class RuleTests(unittest.TestCase):
@@ -31,17 +31,24 @@ class RuleTests(unittest.TestCase):
 
     def test_official_priority_overrides(self):
         records = pd.DataFrame([
-            {"client": "FISIO LIFE", "priority": "CREDENCIAMENTO"},
-            {"client": "FISIO LIFE", "priority": "META CREDENCIAMENTO"},
-            {"client": "FISIO LIFE", "priority": "REAJUSTE"},
+            {"client": "Cliente Exemplo", "priority": "CREDENCIAMENTO"},
+            {"client": "Cliente Exemplo", "priority": "META CREDENCIAMENTO"},
+            {"client": "Cliente Exemplo", "priority": "REAJUSTE"},
         ])
         roster = pd.DataFrame([
-            {"client": "FISIO LIFE", "responsible": "Dulcineia", "priority": "Todas as PRIORIDADES, com exceção CREDENCIAMENTO e META CREDENCIAMENTO"},
-            {"client": "TODOS OS CLIENTES", "responsible": "Felipe", "priority": "CREDENCIAMENTO"},
-            {"client": "TODOS OS CLIENTES", "responsible": "Niziane", "priority": "META CREDENCIAMENTO"},
+            {"client": "Cliente Exemplo", "responsible": "Responsável Alfa", "priority": "Todas as PRIORIDADES, com exceção CREDENCIAMENTO e META CREDENCIAMENTO"},
+            {"client": "TODOS OS CLIENTES", "responsible": "Responsável Beta", "priority": "CREDENCIAMENTO"},
+            {"client": "TODOS OS CLIENTES", "responsible": "Responsável Gama", "priority": "META CREDENCIAMENTO"},
         ])
         result = add_responsible(records, roster, pd.DataFrame(columns=["apelido_cliente", "cliente_cadastro"]))
-        self.assertEqual(result.responsible.tolist(), ["Felipe", "Niziane", "Dulcineia"])
+        self.assertEqual(result.responsible.tolist(), ["Responsável Beta", "Responsável Gama", "Responsável Alfa"])
+
+    def test_matrix_quality_errors_keep_available_operator_even_without_records(self):
+        files = [{"name": "matriz-teste.xlsm", "operator": "Operadora Teste", "error": "Falha de leitura", "warnings": ["Estrutura incompleta"]}]
+        quality = make_quality(pd.DataFrame(), files, date(2026, 1, 8), 7)
+        self.assertEqual(len(quality), 2)
+        self.assertEqual(quality.operadora.tolist(), ["Operadora Teste", "Operadora Teste"])
+        self.assertEqual(quality.tipo.tolist(), ["Falha de leitura; dados anteriores preservados", "Estrutura incompleta"])
 
     def test_indicators_separate_card_and_operator_categories(self):
         rows = pd.DataFrame([

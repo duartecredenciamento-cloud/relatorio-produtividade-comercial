@@ -208,9 +208,9 @@ def read_responsibles(path: Path) -> tuple[pd.DataFrame, list[str]]:
     warnings = []
     if not path.exists():
         raise FileNotFoundError(f"Cadastro oficial não encontrado: {path}")
-    book = pd.ExcelFile(path)
-    sheet = next((s for s in book.sheet_names if "CLIENTES" in _normalize_header(s).upper() or "RESPONSAVEIS" in _normalize_header(s).upper()), book.sheet_names[0])
-    df = pd.read_excel(path, sheet_name=sheet, dtype=str).fillna("")
+    with pd.ExcelFile(path, engine="openpyxl") as book:
+        sheet = next((s for s in book.sheet_names if "CLIENTES" in _normalize_header(s).upper() or "RESPONSAVEIS" in _normalize_header(s).upper()), book.sheet_names[0])
+        df = book.parse(sheet_name=sheet, dtype=str).fillna("")
     df.columns = [_normalize_header(c) for c in df.columns]
     mapping = {}
     for target, possible in {
@@ -236,18 +236,14 @@ def list_matrix_files(root: Path) -> list[Path]:
     if not root.exists() or not root.is_dir():
         return []
     found = []
-    log = logging.getLogger("produtividade")
     def walk_error(error):
-        log.warning("FALHA DE VARREDURA | %s", error)
+        logging.getLogger("produtividade").warning("Falha ao percorrer uma pasta de matrizes (%s).", type(error).__name__)
     for current, dirs, files in os.walk(root, topdown=True, onerror=walk_error):
         current_path = Path(current)
         kept_dirs = []
         for directory in dirs:
             if norm_key(directory) == norm_key("PASTA SUSPENSA"):
-                ignored_dir = str((current_path / directory).resolve())
-                if ignored_dir not in _IGNORED_LOGGED:
-                    log.info("IGNORADO | pasta PASTA SUSPENSA | %s", ignored_dir)
-                    _IGNORED_LOGGED.add(ignored_dir)
+                continue
             else:
                 kept_dirs.append(directory)
         dirs[:] = kept_dirs
@@ -257,15 +253,6 @@ def list_matrix_files(root: Path) -> list[Path]:
             if suffix not in {".xlsm", ".xlsx", ".xls"}:
                 continue
             if name.startswith("~$") or suffix != ".xlsm":
-                try:
-                    stamp = path.stat().st_mtime_ns
-                except OSError:
-                    stamp = -1
-                token = (str(path.resolve()), stamp)
-                if token not in _IGNORED_LOGGED:
-                    reason = "temporário do Excel" if name.startswith("~$") else "somente .xlsm são fonte operacional"
-                    log.info("IGNORADO | %s | %s", path.name, reason)
-                    _IGNORED_LOGGED.add(token)
                 continue
             found.append(path)
     return sorted(found, key=lambda p: str(p).casefold())

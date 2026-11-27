@@ -34,7 +34,7 @@
       const response = await fetch(endpoint, {method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},credentials:'same-origin',cache:'no-store',body:JSON.stringify(payload)});
       let result = {}; try { result = await response.json(); } catch (_) {}
       if (!response.ok) { error.textContent = result.error || 'Não foi possível concluir. Tente novamente.'; error.hidden = false; return; }
-      window.location.replace('/');
+      window.location.replace(result.redirect || '/painelgeral.html');
     } catch (_) { error.textContent = 'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.'; error.hidden = false; }
     finally { button.disabled = false; button.classList.remove('is-loading'); button.removeAttribute('aria-busy'); }
   }

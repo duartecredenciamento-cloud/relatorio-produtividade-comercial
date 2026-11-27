@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from socketserver import ThreadingMixIn
 from urllib.parse import parse_qs, urlparse
@@ -47,6 +47,10 @@ if not logger.handlers:
     h = logging.FileHandler(LOG, encoding="utf-8")
     h.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
     logger.addHandler(h)
+    try:
+        LOG.chmod(0o600)
+    except OSError:
+        pass
 
 DEFAULT_CONFIG = {
     "matrices_dir": "dados/matrizes",
@@ -182,13 +186,13 @@ def sync_drive_matrices(force=False):
                 _, done = downloader.next_chunk()
             content = buffer.getvalue()
             if not content:
-                raise RuntimeError(f"A matriz {name} foi baixada vazia; os dados atuais foram preservados.")
+                raise RuntimeError("Uma matriz foi baixada vazia; os dados atuais foram preservados.")
             try:
                 with zipfile.ZipFile(io.BytesIO(content)) as workbook:
                     if workbook.testzip() is not None:
                         raise ValueError("arquivo XLSM danificado")
             except Exception as exc:
-                raise RuntimeError(f"A matriz {name} não passou na validação do arquivo; os dados atuais foram preservados.") from exc
+                raise RuntimeError("Uma matriz não passou na validação; os dados atuais foram preservados.") from exc
 
             temporary = destination.with_name(destination.name + ".drive-part")
             temporary.write_bytes(content)
@@ -221,7 +225,7 @@ def load_config():
     try:
         cfg.update(json.loads(CONFIG.read_text(encoding="utf-8")))
     except Exception as exc:
-        logger.warning("Configuração padrão utilizada: %s", exc)
+        logger.warning("Configuração inválida; usando parâmetros padrão (%s).", type(exc).__name__)
     if os.environ.get("MATRICES_DIR"):
         cfg["matrices_dir"] = os.environ["MATRICES_DIR"]
     if os.environ.get("RESPONSIBLES_FILE"):
@@ -285,8 +289,8 @@ class DashboardStore:
             try:
                 drive_sync = sync_drive_matrices(force=force)
             except Exception as exc:
-                drive_error = f"Google Drive: {type(exc).__name__}: {exc}"
-                logger.exception("SINCRONIZAÇÃO GOOGLE DRIVE INDISPONÍVEL")
+                drive_error = f"Google Drive: sincronização indisponível ({type(exc).__name__})."
+                logger.warning("Sincronização Google Drive indisponível (%s).", type(exc).__name__)
             if not root.is_dir():
                 raise FileNotFoundError(f"Pasta de matrizes indisponível: {root}")
             paths = list_matrix_files(root)
@@ -295,34 +299,37 @@ class DashboardStore:
                 for removed in set(self.matrix_cache) - present:
                     del self.matrix_cache[removed]
                     changed = True
-                    logger.info("REMOVIDO | %s", removed)
+                    logger.info("Uma matriz ausente foi retirada da memória operacional.")
             for matrix_index, p in enumerate(paths, start=1):
-                logger.info("LENDO MATRIZ %s/%s | %s", matrix_index, len(paths), p.name)
+                logger.info("Leitura de matriz iniciada (%s de %s).", matrix_index, len(paths))
                 key = str(p.resolve())
                 prev = self.matrix_cache.get(key)
                 try:
                     st = p.stat()
                     quick = (st.st_size, st.st_mtime_ns)
                     if prev and prev["fingerprint"] == quick and not force:
-                        new_status.append({"name":p.name,"state":"Sem alteração","rows":prev["rows"],"error":"","warnings":prev["warnings"]})
+                        new_status.append({"name":p.name,"operator":", ".join(sorted({str(r.get("operator", "")).strip() for r in prev.get("records", []) if str(r.get("operator", "")).strip()})),"state":"Sem alteração","rows":prev["rows"],"error":"","warnings":prev["warnings"]})
                         any_ok = True
                         continue
                     fp = stable_fingerprint(p, settle_seconds=.2, retries=2)
                     if prev and prev["fingerprint"] == fp and not force:
-                        new_status.append({"name":p.name,"state":"Estável — sem alteração","rows":prev["rows"],"error":"","warnings":prev["warnings"]})
+                        new_status.append({"name":p.name,"operator":", ".join(sorted({str(r.get("operator", "")).strip() for r in prev.get("records", []) if str(r.get("operator", "")).strip()})),"state":"Estável — sem alteração","rows":prev["rows"],"error":"","warnings":prev["warnings"]})
                         any_ok = True
                         continue
                     parsed = read_matrix(p)
                     self.matrix_cache[key] = {"fingerprint":fp,"records":parsed["records"],"rows":parsed["rows"],"warnings":parsed["warnings"]}
                     changed = True
-                    new_status.append({"name":p.name,"state":"Atualizado","rows":parsed["rows"],"error":"","warnings":parsed["warnings"]})
-                    logger.info("LIDO/ALTERADO | %s | linhas=%s | registros=%s | avisos=%s",p.name,parsed["rows"],len(parsed["records"]),len(parsed["warnings"]))
+                    operator_names = sorted({str(r.get("operator", "")).strip() for r in parsed["records"] if str(r.get("operator", "")).strip()})
+                    new_status.append({"name":p.name,"operator":", ".join(operator_names),"state":"Atualizado","rows":parsed["rows"],"error":"","warnings":parsed["warnings"]})
+                    logger.info("Matriz lida; linhas=%s; avisos=%s.", parsed["rows"], len(parsed["warnings"]))
                     any_ok=True
                 except Exception as exc:
                     errors=True
-                    msg=f"{type(exc).__name__}: {exc}"
-                    new_status.append({"name":p.name,"state":"Falha — dados anteriores preservados" if prev else "Falha de leitura","rows":prev["rows"] if prev else 0,"error":msg,"warnings":prev["warnings"] if prev else []})
-                    logger.exception("FALHA | %s",p.name)
+                    msg="Falha de leitura; confira a integridade e os cabeçalhos da matriz."
+                    previous_records = prev.get("records", []) if prev else []
+                    operator_names = sorted({str(r.get("operator", "")).strip() for r in previous_records if str(r.get("operator", "")).strip()})
+                    new_status.append({"name":p.name,"operator":", ".join(operator_names),"state":"Falha — dados anteriores preservados" if prev else "Falha de leitura","rows":prev["rows"] if prev else 0,"error":msg,"warnings":prev["warnings"] if prev else []})
+                    logger.warning("Leitura de matriz falhou (%s); dados anteriores preservados quando disponíveis.", type(exc).__name__)
             # The responsible roster is checked every cycle; a failed read never replaces a valid roster.
             roster_path=resolve(cfg["responsibles_file"])
             try:
@@ -332,11 +339,11 @@ class DashboardStore:
                     self.roster=roster
                     self.roster_fp=fp
                     changed = True
-                    logger.info("CADASTRO ATUALIZADO | %s | registros=%s",roster_path.name,len(roster))
+                    logger.info("Cadastro de responsáveis carregado; registros=%s.",len(roster))
             except Exception as exc:
-                roster_error=f"Cadastro de responsáveis: {exc}"
-                new_status.append({"name":roster_path.name,"state":"Falha no cadastro; responsáveis anteriores preservados","rows":0,"error":roster_error,"warnings":[]})
-                logger.warning("CADASTRO PRESERVADO | %s",exc)
+                roster_error="Cadastro de responsáveis indisponível; verifique caminho, formato e cabeçalhos."
+                new_status.append({"name":roster_path.name,"operator":"","state":"Falha no cadastro; responsáveis anteriores preservados","rows":0,"error":roster_error,"warnings":[]})
+                logger.warning("Cadastro de responsáveis preservado após falha (%s).", type(exc).__name__)
             self.file_status=new_status
             if not paths:
                 self.last_message="Nenhuma matriz .xlsm encontrada; confira a pasta configurada."
@@ -363,10 +370,10 @@ class DashboardStore:
                 with self.lock:
                     self.snapshot_cache = None
         except Exception as exc:
-            self.last_error=f"{type(exc).__name__}: {exc}"
+            self.last_error="Atualização indisponível; confira o diretório de matrizes e as permissões do serviço."
             self.last_message="Atualização indisponível; os últimos dados carregados foram preservados."
-            self.file_status=[{"name":str(root),"state":"Falha de leitura","rows":0,"error":self.last_error,"warnings":[]}]
-            logger.exception("ATUALIZAÇÃO INDISPONÍVEL")
+            self.file_status=[{"name":"Fontes configuradas","operator":"","state":"Falha de leitura","rows":0,"error":self.last_error,"warnings":[]}]
+            logger.error("Atualização geral indisponível (%s).", type(exc).__name__)
         finally:
             with self.lock:
                 self.refreshing=False
@@ -448,7 +455,7 @@ class DashboardStore:
             services.append({"key":service,"name":service,"active":len(a),"inactive":len(inactive),"completed":len(c),"inProgress":len(a)-len(c),"pending":len(p),"achieved":len(c),"target":target,"targetPeriod":str(goal.period) if goal is not None else None})
         indicators=classify_indicator_records(records)
         indicator_counts={k:{"count":len(v),"clients":int(v.client.nunique()) if not v.empty else 0} for k,v in indicators.items()}
-        quality=make_quality(records,file_status,now,cfg["stale_contact_days"]) if not records.empty else pd.DataFrame()
+        quality=make_quality(records,file_status,now,cfg["stale_contact_days"])
         # Every record whose icon is not explicitly represented remains reviewable.
         if not records.empty:
             marker_review=records[records.marker_status=="Revisar"]
@@ -483,7 +490,7 @@ class DashboardStore:
             for _,r in quality.iterrows():
                 quality_rows.append({"type":str(r.get("tipo") or "Alerta"),"client":str(r.get("cliente") or ""),"operator":str(r.get("operadora") or ""),"service":str(r.get("serviço") or ""),"status":str(r.get("status") or ""),"lastContact":iso(r.get("último_contato")),"source":str(r.get("fonte") or ""),"detail":str(r.get("detalhe") or "")})
         updated=last_success.isoformat(timespec="seconds") if last_success else None
-        response={"mode":"live","statusLabel":"ATUALIZAÇÃO EM ANDAMENTO" if refreshing else ("MATRIZES · COM AVISOS" if last_error or any(f.get("error") for f in file_status) else "MATRIZES · ATUALIZADAS"),"statusMessage":message,"updatedAt":updated,"referenceDate":now.isoformat(),"kpis":{"active":len(active),"inactive":int(records.status.map(is_inactive).sum()) if not records.empty else 0,"completed":len(completed),"inProgress":len(active)-len(completed),"pending":len(pending),"owners":len({x["name"] for x in owner_groups if x["name"]!="Responsável não identificado"}),"unassigned":sum(x["name"]=="Responsável não identificado" for x in owner_groups),"completionRate":round(len(completed)/len(active)*100) if len(active) else 0,"markerReview":sum(x["marker"]=="Revisar" for x in mapped)},"services":services,"processes":mapped,"pendingRecords":pending_mapped,"owners":owner_groups,"priorities":priorities,"indicators":indicator_counts,"quality":quality_rows,"qualitySummary":qrecords,"fileStatus":file_status,"filterOptions":all_opts,"config":{"pendingDays":cfg["pending_days"],"pendingRedDays":cfg.get("pending_red_days",10),"refreshSeconds":cfg["refresh_seconds"],"staleContactDays":cfg["stale_contact_days"]},"duplicates":duplicate_count}
+        response={"mode":"live","statusLabel":"ATUALIZAÇÃO EM ANDAMENTO" if refreshing else ("MATRIZES · COM AVISOS" if last_error or any(f.get("error") or f.get("warnings") for f in file_status) else "MATRIZES · ATUALIZADAS"),"statusMessage":message,"updatedAt":updated,"referenceDate":now.isoformat(),"kpis":{"active":len(active),"inactive":int(records.status.map(is_inactive).sum()) if not records.empty else 0,"completed":len(completed),"inProgress":len(active)-len(completed),"pending":len(pending),"owners":len({x["name"] for x in owner_groups if x["name"]!="Responsável não identificado"}),"unassigned":sum(x["name"]=="Responsável não identificado" for x in owner_groups),"completionRate":round(len(completed)/len(active)*100) if len(active) else 0,"markerReview":sum(x["marker"]=="Revisar" for x in mapped)},"services":services,"processes":mapped,"pendingRecords":pending_mapped,"owners":owner_groups,"priorities":priorities,"indicators":indicator_counts,"quality":quality_rows,"qualitySummary":qrecords,"fileStatus":file_status,"filterOptions":all_opts,"config":{"pendingDays":cfg["pending_days"],"pendingRedDays":cfg.get("pending_red_days",10),"refreshSeconds":cfg["refresh_seconds"],"staleContactDays":cfg["stale_contact_days"]},"duplicates":duplicate_count}
         if cacheable:
             with self.lock:
                 if not self.refreshing:
@@ -514,11 +521,17 @@ def filter_records(df,query):
 
 STORE=DashboardStore()
 
-class Handler(SimpleHTTPRequestHandler):
-    def __init__(self,*args,**kwargs):super().__init__(*args,directory=str(BASE),**kwargs)
-    def log_message(self,fmt,*args):logger.info("HTTP | %s",fmt%args)
+class Handler(BaseHTTPRequestHandler):
+    server_version = "DuarteDashboard"
+    sys_version = ""
+    def __init__(self,*args,**kwargs):super().__init__(*args,**kwargs)
+    def log_message(self,fmt,*args):
+        # Request paths and query strings can contain client names; do not log them.
+        return
     def _secure_cookie(self):
-        return os.environ.get("PORT") is not None or self.headers.get("X-Forwarded-Proto", "").split(",")[0].strip().casefold()=="https"
+        forwarded = self.headers.get("X-Forwarded-Proto", "").split(",")[0].strip().casefold()
+        railway = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PUBLIC_DOMAIN"))
+        return forwarded == "https" or railway
     def _cookie_token(self):
         jar=SimpleCookie()
         try: jar.load(self.headers.get("Cookie", ""))
@@ -575,7 +588,7 @@ class Handler(SimpleHTTPRequestHandler):
         data=json.dumps(obj,ensure_ascii=False,default=str).encode("utf-8")
         compressed="gzip" in self.headers.get("Accept-Encoding","").lower()
         if compressed:data=gzip.compress(data,compresslevel=5)
-        self.send_response(status);self.send_header("Content-Type","application/json; charset=utf-8");self.send_header("Content-Length",str(len(data)));self.send_header("Cache-Control","no-store, max-age=0");self.send_header("Pragma","no-cache");self.send_header("X-Content-Type-Options","nosniff")
+        self.send_response(status);self.send_header("Content-Type","application/json; charset=utf-8");self.send_header("Content-Length",str(len(data)));self.send_header("Cache-Control","no-store, max-age=0");self.send_header("Pragma","no-cache");self.send_header("X-Content-Type-Options","nosniff");self.send_header("X-Frame-Options","DENY");self.send_header("Referrer-Policy","strict-origin-when-cross-origin")
         if compressed:self.send_header("Content-Encoding","gzip");self.send_header("Vary","Accept-Encoding")
         if headers:
             for key,value in headers.items():self.send_header(key,value)
@@ -587,25 +600,33 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(200);self.send_header("Content-Type",mime+("; charset=utf-8" if mime.startswith("text/") or "javascript" in mime else ""));self.send_header("Content-Length",str(len(payload)));self.send_header("Cache-Control","no-store, max-age=0");self.send_header("Pragma","no-cache");self.send_header("X-Content-Type-Options","nosniff");self.send_header("Referrer-Policy","strict-origin-when-cross-origin");self.send_header("X-Frame-Options","DENY");self.send_header("Content-Security-Policy","default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'");self.end_headers();self.wfile.write(payload)
     def authorize(self):
         if not self._auth_configured():
-            self.send_json({"error":"Acesso indisponível: configure DASHBOARD_USER e DASHBOARD_PASSWORD como variáveis privadas do serviço."},503)
+            self.send_json({"error":"Acesso indisponível: o administrador precisa configurar as credenciais do painel."},503)
             return False
         if self.has_session():return True
         self.send_json({"error":"Sessão encerrada. Entre novamente."},401)
         return False
+    def _redirect(self, location, status=303):
+        self.send_response(status)
+        self.send_header("Location", location)
+        self.send_header("Cache-Control", "no-store, max-age=0")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        self.end_headers()
     def do_GET(self):
         parsed=urlparse(self.path)
         if parsed.path=="/api/health":return self.send_json({"ok":True,"refreshing":STORE.refreshing,"updatedAt":STORE.last_success.isoformat(timespec="seconds") if STORE.last_success else None})
-        if parsed.path=="/login":
-            if self.has_session():
-                self.send_response(303);self.send_header("Location","/");self.send_header("Cache-Control","no-store, max-age=0");self.end_headers();return
+        if parsed.path=="/":
+            destination="/painelgeral.html" if self.has_session() and self._auth_configured() else "/login.html"
+            return self._redirect(destination)
+        if parsed.path=="/login":return self._redirect("/login.html",301)
+        if parsed.path=="/login.html":
+            if self.has_session() and self._auth_configured():return self._redirect("/painelgeral.html")
             return self.send_file("login.html")
         if parsed.path in {"/assets/login.css","/assets/login.js","/assets/brand-logo.png"}:
             return self.send_file(parsed.path.lstrip("/"))
-        if parsed.path=="/":
-            if not self.has_session():
-                self.send_response(303);self.send_header("Location","/login");self.send_header("Cache-Control","no-store, max-age=0");self.end_headers();return
-            if not self._auth_configured():return self.send_json({"error":"Credenciais do painel não configuradas."},503)
-            return self.send_file("index.html")
+        if parsed.path=="/painelgeral.html":
+            if not self.has_session():return self._redirect("/login.html")
+            if not self._auth_configured():return self.send_json({"error":"Acesso indisponível: o administrador precisa configurar as credenciais do painel."},503)
+            return self.send_file("painelgeral.html")
         if not self.authorize():return
         if parsed.path=="/api/session":return self.send_json({"authenticated":True})
         if parsed.path=="/api/dashboard":return self.send_json(STORE.snapshot(parse_qs(parsed.query)))
@@ -640,7 +661,7 @@ class Handler(SimpleHTTPRequestHandler):
         with _sessions_lock:_sessions[token]={"expires":now+_SESSION_TTL,"username":username}
         secure="; Secure" if self._secure_cookie() else ""
         cookie=f"{_SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={_SESSION_TTL}{secure}"
-        return self.send_json({"ok":True},200,{"Set-Cookie":cookie})
+        return self.send_json({"ok":True,"redirect":"/painelgeral.html"},200,{"Set-Cookie":cookie})
     def register(self):
         if not self._auth_configured():
             return self.send_json({"error":"O administrador precisa configurar as credenciais do painel antes do cadastro."},503)
@@ -692,7 +713,7 @@ class Handler(SimpleHTTPRequestHandler):
         secure="; Secure" if self._secure_cookie() else ""
         cookie=f"{_SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={_SESSION_TTL}{secure}"
         with _login_attempts_lock:_login_attempts.pop(ip,None)
-        return self.send_json({"ok":True},201,{"Set-Cookie":cookie})
+        return self.send_json({"ok":True,"redirect":"/painelgeral.html"},201,{"Set-Cookie":cookie})
     def do_POST(self):
         parsed=urlparse(self.path)
         if parsed.path=="/api/login":return self.login()
@@ -717,8 +738,11 @@ class Handler(SimpleHTTPRequestHandler):
                 STORE.save_goal(str(body.get("service","")),body.get("target"),str(body.get("period","manual")))
                 return self.send_json({"ok":True})
             return self.send_json({"error":"Endpoint não encontrado."},404)
-        except KeyError as exc:return self.send_json({"error":str(exc)},404)
-        except Exception as exc:return self.send_json({"error":str(exc)},400)
+        except KeyError:
+            return self.send_json({"error":"O registro solicitado não está disponível na carga atual."},404)
+        except Exception as exc:
+            logger.warning("Requisição da API rejeitada (%s).", type(exc).__name__)
+            return self.send_json({"error":"Não foi possível processar a solicitação. Revise os dados e tente novamente."},400)
 
 class Server(ThreadingHTTPServer):
     daemon_threads=True

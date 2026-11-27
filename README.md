@@ -1,25 +1,48 @@
-# Duarte · Produtividade Comercial — atualização de acesso e visual
+# Duarte · Relatório de Produtividade Comercial
 
-Esta versão reúne o servidor, o painel e a tela de login/cadastro. O cadastro de usuários é protegido por código de convite; senhas são guardadas com hash PBKDF2 no volume persistente do Railway, nunca em texto simples. O usuário e a senha administrativos configurados por ambiente continuam funcionando.
+Aplicação web em Python com painel HTML/CSS/JavaScript, abas operacionais, filtros, metas manuais, revisão de marcações e sincronização opcional de matrizes `.xlsm` do Google Drive.
 
-## Railway
+## Endereços e autenticação
 
-1. Substitua os arquivos do repositório pelos deste pacote e publique a atualização.
-2. Mantenha o volume persistente montado em `/data`.
-3. Configure as variáveis privadas já usadas pelo painel: `DASHBOARD_USER`, `DASHBOARD_PASSWORD`, `MATRICES_DIR=/data/matrizes`, `RESPONSIBLES_FILE=/data/clientes_credenciamento_responsaveis.xlsx`, `APPDATA_DIR=/data/appdata`, `GOOGLE_DRIVE_FOLDER_ID`, `GOOGLE_SERVICE_ACCOUNT_JSON` e `DRIVE_SYNC_SECONDS=900`.
-4. Crie `DASHBOARD_INVITE_CODE` como um código longo e aleatório, compartilhe-o apenas com as pessoas que podem criar contas e salve as variáveis. Sem essa variável, o cadastro permanece fechado; o login administrativo continua disponível.
-5. O arquivo `accounts.json` é criado em `APPDATA_DIR` no primeiro cadastro. Por isso, o volume persistente em `/data` é necessário para preservar as contas após deploy/reinício.
+- `/` encaminha para `/login.html` sem sessão válida e para `/painelgeral.html` com sessão válida.
+- `/login.html` é a tela de acesso e cadastro por convite.
+- `/painelgeral.html` e as APIs que entregam dados do painel exigem sessão válida no servidor.
+- Login e cadastro válidos levam a `/painelgeral.html`. O botão **Sair** invalida a sessão no servidor.
+- As sessões usam token aleatório em cookie `HttpOnly`, `SameSite=Strict` e `Secure` quando executado com `PORT` (Railway) ou quando HTTPS é indicado pelo proxy. A validade é de 8 horas.
+- O login administrativo vem exclusivamente de `DASHBOARD_USER` e `DASHBOARD_PASSWORD`. Contas criadas armazenam apenas hash PBKDF2 com salt aleatório no `APPDATA_DIR`.
+- O cadastro só aceita convite fornecido por `DASHBOARD_INVITE_CODE`; sem essa variável, fica fechado. O código não é enviado à interface pelo servidor.
 
-A conta administrativa configurada por `DASHBOARD_USER`/`DASHBOARD_PASSWORD` não depende do cadastro. Cada conta criada recebe sessão individual, expira após 8 horas e pode sair pelo botão da interface. Código de convite não substitui autorização interna: revogue/rotacione o código depois de usá-lo.
+## Configuração no Railway
 
-## Dados
+Monte um volume persistente em `/data` e configure as variáveis privadas no serviço. As variáveis aceitas são:
 
-Este pacote não inclui matrizes, cadastro de clientes, logs de operação ou credenciais. Não adicione planilhas, chaves JSON, senhas ou arquivos de dados ao Git. O código continua usando `GOOGLE_DRIVE_FOLDER_ID` e `GOOGLE_SERVICE_ACCOUNT_JSON` para sincronizar matrizes, quando configurados.
+- `PORT`: porta fornecida pelo Railway; o servidor escuta em `0.0.0.0` quando essa variável existe.
+- `REQUIRE_AUTH`: a autenticação deste pacote é sempre obrigatória no servidor; não defina esta variável como forma de desativar a proteção.
+- `DASHBOARD_USER` e `DASHBOARD_PASSWORD`: credenciais administrativas fortes, definidas por você.
+- `DASHBOARD_INVITE_CODE`: código longo e aleatório para autorizar novos cadastros; opcional, mas obrigatório para abrir o cadastro.
+- `MATRICES_DIR`: pasta persistente das matrizes, por exemplo `/data/matrizes`.
+- `APPDATA_DIR`: pasta persistente de contas, estado da integração, metas e revisões, por exemplo `/data/appdata`.
+- `RESPONSIBLES_FILE`: caminho do cadastro oficial de responsáveis, por exemplo `/data/clientes_credenciamento_responsaveis.xlsx`; mantenha o arquivo no armazenamento privado e não no Git.
+- `GOOGLE_DRIVE_FOLDER_ID`: ID da pasta oficial do Drive **NOVA MATRIZ CREDENCIAMENTO**.
+- `GOOGLE_SERVICE_ACCOUNT_JSON`: conteúdo JSON da conta de serviço fornecido como variável privada, nunca como arquivo no repositório.
+- `DRIVE_SYNC_SECONDS`: intervalo mínimo de sincronização do Drive em segundos; o padrão implementado é 900 segundos quando não definido (mínimo aceito: 60).
+
+Compartilhe a pasta oficial do Drive com a conta de serviço com permissão de leitura. Se as duas variáveis do Drive não estiverem configuradas, a aplicação usa apenas os arquivos já disponíveis no diretório de matrizes. O ciclo de leitura local mantém o intervalo padrão existente de 60 segundos e usa cache para não reabrir matrizes inalteradas.
+
+O volume persistente preserva `accounts.json`, `metas_manuais.csv`, `marcacoes_manuais.csv` e o estado da sincronização. Nenhum valor de segredo vem preenchido neste pacote.
 
 ## Execução local
 
-Instale Python 3.11+, execute `pip install -r requirements.txt` e `python app_server.py`. Para cadastro local, configure também `DASHBOARD_INVITE_CODE`.
+Instale Python 3.11 ou superior, execute `pip install -r requirements.txt` e inicie com `python app_server.py`. Para o primeiro acesso local, configure `DASHBOARD_USER` e `DASHBOARD_PASSWORD` no ambiente. O script `iniciar.ps1` também solicita credenciais e caminhos locais sem embutir senhas.
+
+## Regras de prazo mantidas
+
+Foi preservada a regra existente no projeto: até 7 dias fica dentro do prazo e fora das metas pendentes; de 8 a 10 dias é laranja; acima de 10 dias é vermelho. O campo de bolinha não confirma o prazo automaticamente e pode continuar em revisão manual. As fórmulas das matrizes examinadas tratam vencimentos de contrato/reajuste em 60 dias; não foi encontrada nelas uma fórmula específica de meta pendente, então não se substituiu a regra já implementada.
 
 ## Testes
 
-Execute `python -m unittest discover -s tests -v`.
+Com as dependências instaladas, execute `python -m unittest discover -s tests -v`. Os testes usam dados sintéticos e não precisam de matrizes reais, credenciais Google ou publicação.
+
+## Proteção de dados
+
+Não inclua planilhas reais, arquivos `.xlsm`, `.xlsx`, `.xls`, logs, `.env`, senhas, contas de serviço ou caches no Git ou no pacote. O `.gitignore` e o `.dockerignore` excluem essas categorias; confira o estado do repositório antes de qualquer commit. Esta entrega não publica no Railway nem envia alterações ao GitHub.

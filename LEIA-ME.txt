@@ -1,0 +1,18 @@
+DUARTE · RELATÓRIO DE PRODUTIVIDADE COMERCIAL
+
+INÍCIO
+- Instale as dependências com `pip install -r requirements.txt`.
+- Configure DASHBOARD_USER e DASHBOARD_PASSWORD no ambiente.
+- Execute `python app_server.py` ou use iniciar.ps1 no Windows.
+- Abra /login.html; após o acesso, o painel fica em /painelgeral.html.
+
+DADOS E SEGREDOS
+Este pacote não inclui matrizes, cadastro de responsáveis, logs, senhas nem chave de serviço. Mantenha esses itens no armazenamento privado ou configure-os como variáveis de ambiente. No Railway, use o volume persistente e as variáveis descritas no README.md.
+
+GOOGLE DRIVE
+Configure GOOGLE_DRIVE_FOLDER_ID e GOOGLE_SERVICE_ACCOUNT_JSON como variáveis privadas para sincronizar a pasta oficial. O JSON da conta de serviço nunca deve ser adicionado ao repositório. Configure também MATRICES_DIR, APPDATA_DIR e RESPONSIBLES_FILE conforme o armazenamento do serviço.
+
+TESTES
+`python -m unittest discover -s tests -v`
+
+A entrega é somente o código corrigido: nenhum deploy ou push foi feito.

@@ -1,7 +1,29 @@
+# Python e ambientes locais
 __pycache__/
 *.py[cod]
-appdata/
-dados/matrizes/
-dados/*.xlsx
+.venv/
+venv/
+.pytest_cache/
+
+# Segredos e configurações locais
 .env
-*.json.key
+.env.*
+!.env.example
+*.pem
+*.key
+*.json
+!config.json
+
+# Dados operacionais e arquivos de execução
+appdata/*
+!appdata/.gitkeep
+dados/matrizes/*
+!dados/matrizes/.gitkeep
+dados/*.xlsx
+dados/*.xlsm
+dados/*.xls
+**/~$*
+*.log
+*.tmp
+*.drive-part
+*.bak

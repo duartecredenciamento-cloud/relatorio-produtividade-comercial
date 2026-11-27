@@ -173,33 +173,34 @@ def add_responsible(records: pd.DataFrame, roster: pd.DataFrame, aliases: pd.Dat
 
 
 def make_quality(records: pd.DataFrame, files: list[dict], today: date, days: int) -> pd.DataFrame:
-    if records.empty:
-        return pd.DataFrame(columns=["tipo", "cliente", "operadora", "serviço", "status", "último_contato", "fonte", "detalhe"])
+    columns = ["tipo", "cliente", "operadora", "serviço", "status", "último_contato", "fonte", "detalhe"]
     rows = []
-    for _, r in records.iterrows():
-        if r.get("client_match") not in ("Cadastro oficial", "Prioridade especial do cadastro"):
-            rows.append({"tipo": "Cliente/responsável para revisão", "cliente": r.client, "operadora": r.operator,
-                         "serviço": r.service, "status": r.status, "último_contato": r.last_contact,
-                         "fonte": r.source, "detalhe": r.client_match})
-        if pd.isna(r.last_contact):
-            rows.append({"tipo": "Data de contato ausente ou inválida", "cliente": r.client, "operadora": r.operator,
-                         "serviço": r.service, "status": r.status, "último_contato": None,
-                         "fonte": r.source, "detalhe": "Verificar a coluna ÚLTIMO CONTATO correspondente ao serviço"})
-        elif is_active(r.status) and (today - pd.Timestamp(r.last_contact).date()).days > days:
-            age = (today - pd.Timestamp(r.last_contact).date()).days
-            rows.append({"tipo": "Contato antigo (sem inferir falta de atividade externa)", "cliente": r.client,
-                         "operadora": r.operator, "serviço": r.service, "status": r.status,
-                         "último_contato": r.last_contact, "fonte": r.source,
-                         "detalhe": f"Último contato há {age} dias"})
+    if not records.empty:
+        for _, r in records.iterrows():
+            if r.get("client_match") not in ("Cadastro oficial", "Prioridade especial do cadastro"):
+                rows.append({"tipo": "Cliente/responsável para revisão", "cliente": r.client, "operadora": r.operator,
+                             "serviço": r.service, "status": r.status, "último_contato": r.last_contact,
+                             "fonte": r.source, "detalhe": r.client_match})
+            if pd.isna(r.last_contact):
+                rows.append({"tipo": "Data de contato ausente ou inválida", "cliente": r.client, "operadora": r.operator,
+                             "serviço": r.service, "status": r.status, "último_contato": None,
+                             "fonte": r.source, "detalhe": "Verificar a coluna ÚLTIMO CONTATO correspondente ao serviço"})
+            elif is_active(r.status) and (today - pd.Timestamp(r.last_contact).date()).days > days:
+                age = (today - pd.Timestamp(r.last_contact).date()).days
+                rows.append({"tipo": "Contato antigo (sem inferir falta de atividade externa)", "cliente": r.client,
+                             "operadora": r.operator, "serviço": r.service, "status": r.status,
+                             "último_contato": r.last_contact, "fonte": r.source,
+                             "detalhe": f"Último contato há {age} dias"})
     for f in files:
+        operator = str(f.get("operator") or "")
         if f.get("error"):
-            rows.append({"tipo": "Falha de leitura; dados anteriores preservados", "cliente": "", "operadora": "",
+            rows.append({"tipo": "Falha de leitura; dados anteriores preservados", "cliente": "", "operadora": operator,
                          "serviço": "", "status": "", "último_contato": None, "fonte": f.get("name", ""),
                          "detalhe": f["error"]})
         for warning in f.get("warnings", []):
-            rows.append({"tipo": "Estrutura incompleta", "cliente": "", "operadora": "", "serviço": "",
+            rows.append({"tipo": "Estrutura incompleta", "cliente": "", "operadora": operator, "serviço": "",
                          "status": "", "último_contato": None, "fonte": f.get("name", ""), "detalhe": warning})
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=columns)
 
 
 def pending_records(records: pd.DataFrame, days: int, today: date | None = None, red_days: int = 10) -> pd.DataFrame:

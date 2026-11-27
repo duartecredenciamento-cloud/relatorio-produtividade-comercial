@@ -1,19 +1,15 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-if exist ".venv\Scripts\python.exe" (
-  .venv\Scripts\python.exe app_server.py
-) else (
-  where py >nul 2>nul
-  if errorlevel 1 (
-    echo Python nao foi encontrado. Execute instalar.bat primeiro.
-    pause
-    exit /b 1
-  )
-  py -3 app_server.py
+where powershell.exe >nul 2>nul
+if errorlevel 1 (
+  echo PowerShell nao foi encontrado.
+  pause
+  exit /b 1
 )
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0iniciar.ps1"
 if errorlevel 1 (
   echo.
-  echo O painel foi encerrado com erro. Confira a configuracao e appdata\atualizacoes.log.
+  echo O painel foi encerrado com erro. Confira as variaveis de ambiente e o armazenamento privado.
   pause
 )

@@ -1,13 +1,11 @@
 import os
 import tempfile
 import unittest
-import uuid
 from pathlib import Path
 from unittest.mock import patch
 
-_TEST_DATA = Path(__file__).resolve().parents[1] / f".test_appdata_{uuid.uuid4().hex}"
-_TEST_DATA.mkdir(parents=True, exist_ok=True)
-os.environ["APPDATA_DIR"] = str(_TEST_DATA)
+_TEST_DATA = tempfile.TemporaryDirectory(prefix="duarte-refresh-tests-")
+os.environ["APPDATA_DIR"] = _TEST_DATA.name
 import app_server
 
 
@@ -24,7 +22,8 @@ class RefreshFailureTests(unittest.TestCase):
                 store.refresh(force=True)
             self.assertFalse(store.refreshing)
             self.assertIn("Google Drive", store.last_message)
-            self.assertIn("falha simulada", store.last_error)
+            self.assertIn("sincronização indisponível", store.last_error)
+            self.assertNotIn("falha simulada", store.last_error)
 
 
 if __name__ == "__main__":
